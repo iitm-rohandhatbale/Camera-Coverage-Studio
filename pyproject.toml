@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "camera-viewer-tool"
+version = "0.1.0"
+description = "Camera Coverage and Planning Tool"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "open3d>=0.18",
+  "trimesh>=4.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.5",
+  "pytest>=8.0"
+]
+
+[project.scripts]
+camera-viewer = "camera_viewer.app:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
