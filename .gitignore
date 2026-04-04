@@ -194,7 +194,11 @@ cython_debug/
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
 #  and can be added to the global gitignore or merged into this file. However, if you prefer, 
 #  you could uncomment the following to ignore the entire vscode folder
+<<<<<<< HEAD
 .vscode/
+=======
+# .vscode/
+>>>>>>> 136876a467015f4a651f8685c6a9b24014702af6
 
 # Ruff stuff:
 .ruff_cache/
@@ -212,4 +216,8 @@ cython_debug/
 # Marimo
 marimo/_static/
 marimo/_lsp/
+<<<<<<< HEAD
 __marimo__/
+=======
+__marimo__/
+>>>>>>> 136876a467015f4a651f8685c6a9b24014702af6
