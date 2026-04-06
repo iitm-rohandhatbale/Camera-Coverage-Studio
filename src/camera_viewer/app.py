@@ -733,6 +733,16 @@ class CameraPlanner:
         self._oscale = self._float_ne(self.object_scale, 78)
         self.panel.add_child(self._kv_row("Scale", self._oscale))
 
+        # Quick scale buttons for common adjustments
+        scale_btn_row = gui.Horiz(4)
+        scale_btn_row.add_child(self._key_lbl("Quick scale:"))
+        scale_btn_row.add_stretch()
+        for factor_label, factor in [("0.5x", 0.5), ("1x", 1.0), ("2x", 2.0)]:
+            btn = gui.Button(factor_label)
+            btn.set_on_clicked(lambda f=factor: self._on_quick_scale(f))
+            scale_btn_row.add_child(btn)
+        self.panel.add_child(scale_btn_row)
+
         btn_obj = gui.Button("Update Object")
         btn_obj.set_on_clicked(self._on_update_object)
         self.panel.add_child(btn_obj)
@@ -1196,6 +1206,15 @@ class CameraPlanner:
         self._set_status(f"Rotated {axis} by {delta:.2f} deg")
         self._autosave_now(show_status=False)
 
+    def _on_quick_scale(self, factor: float):
+        """Apply a quick scale factor to the current object."""
+        self._read_object_ui()
+        self.object_scale = max(0.01, self.object_scale * factor)
+        self._apply_object_transform()
+        self._update_object_panel()
+        self._set_status(f"Object scaled by {factor:g}x (now {self.object_scale:.3f})")
+        self._autosave_now(show_status=False)
+
     # -- Section: Object --------------------------------------
 
     def _build_mesh_section(self):
@@ -1235,6 +1254,11 @@ class CameraPlanner:
         self._mesh_status = gui.Label("No object loaded")
         self._mesh_status.text_color = gui.Color(0.52, 0.52, 0.52)
         self.panel.add_child(self._mesh_status)
+        
+        # Scaling info
+        scale_info = gui.Label("To scale mesh: adjust Scale field or use Quick scale buttons below")
+        scale_info.text_color = gui.Color(0.70, 0.70, 0.70)
+        self.panel.add_child(scale_info)
 
     # -- Section: Camera --------------------------------------
 
@@ -1668,6 +1692,8 @@ class CameraPlanner:
         try:
             ext = os.path.splitext(path)[1].lower()
             import_note = ""
+            mesh = None
+            
             if ext == ".glb":
                 if not TRIMESH_AVAILABLE:
                     raise RuntimeError("GLB loading requires trimesh. Install with: pip install trimesh")
@@ -1676,7 +1702,11 @@ class CameraPlanner:
                     if len(loaded.geometry) == 0:
                         raise ValueError("No mesh geometry found in GLB.")
                     # Export a concatenated mesh with scene graph transforms applied.
-                    merged = loaded.dump(concatenate=True)
+                    # Use to_geometry() if available (trimesh >= 3.17), fallback to dump()
+                    try:
+                        merged = loaded.to_geometry()
+                    except (AttributeError, TypeError):
+                        merged = loaded.dump(concatenate=True)
                 else:
                     merged = loaded
                 if merged.faces is None or len(merged.faces) == 0:
@@ -1692,22 +1722,24 @@ class CameraPlanner:
                     import_note = f" (GLB scale x{glb_scale:g})"
             else:
                 mesh = o3d.io.read_triangle_mesh(path)
-                if len(mesh.triangles) > 0:
-                    mesh.compute_vertex_normals()
-                    mesh.paint_uniform_color([0.55, 0.60, 0.65])
-                    self._set_mesh(mesh, os.path.basename(path) + import_note)
-                    self._mesh_source = {"type": "mesh", "path": os.path.abspath(path)}
+            
+            # Handle mesh if loaded
+            if mesh is not None and len(mesh.triangles) > 0:
+                mesh.compute_vertex_normals()
+                mesh.paint_uniform_color([0.55, 0.60, 0.65])
+                self._set_mesh(mesh, os.path.basename(path) + import_note)
+                self._mesh_source = {"type": "mesh", "path": os.path.abspath(path)}
+            else:
+                # Fall back to point cloud import.
+                lower_name = os.path.basename(path).lower()
+                if lower_name == "points3d.txt":
+                    pcd = parse_colmap_points3d_txt(path)
                 else:
-                    # Fall back to point cloud import.
-                    lower_name = os.path.basename(path).lower()
-                    if lower_name == "points3d.txt":
-                        pcd = parse_colmap_points3d_txt(path)
-                    else:
-                        pcd = o3d.io.read_point_cloud(path)
-                    if len(pcd.points) == 0:
-                        raise ValueError("No triangles or points found.")
-                    self._set_point_cloud(pcd, os.path.basename(path))
-                    self._mesh_source = {"type": "pointcloud", "path": os.path.abspath(path)}
+                    pcd = o3d.io.read_point_cloud(path)
+                if len(pcd.points) == 0:
+                    raise ValueError("No triangles or points found.")
+                self._set_point_cloud(pcd, os.path.basename(path))
+                self._mesh_source = {"type": "pointcloud", "path": os.path.abspath(path)}
             self._autosave_now(show_status=False)
         except Exception as e:
             self._set_status(f"Error: {e}")
