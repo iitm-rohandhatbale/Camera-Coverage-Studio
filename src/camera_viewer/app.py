@@ -26,6 +26,7 @@ Fixes applied (v3):
 
 import os
 import argparse
+import base64
 import copy
 import json
 import re
@@ -318,8 +319,8 @@ def compute_statistics(camera: CameraModel, pts: np.ndarray,
         avg_d = mpp = 0.0
     return dict(total=total, visible=n_vis, coverage=pct,
                 avg_dist=avg_d, mm_per_px=mpp,
-                fov_h_deg=np.degrees(camera.fov_h),
-                fov_v_deg=np.degrees(camera.fov_v))
+                fov_h_deg=float(np.degrees(camera.fov_h)),
+                fov_v_deg=float(np.degrees(camera.fov_v)))
 
 
 # --------------------------------------------------------------
@@ -363,6 +364,8 @@ class CameraPlanner:
         self.vis_engine  = None
         self._last_visible_all = None
         self._last_visible_cam = None
+        self._last_camera_coverages = []
+        self._camera_coord_labels = []
         self._last_stats = None
         self._defect_size_mm = 1.0
         self._defect_threshold_red_px = 3.0
@@ -1397,6 +1400,22 @@ class CameraPlanner:
         self._n_samples = self._int_ne(20000, 80)
         self.panel.add_child(self._kv_row("Sample points", self._n_samples))
 
+        self.panel.add_child(self._hsep())
+        self.panel.add_child(self._section_lbl("[ REPORTS & TRIALS ]"))
+        btn_export = gui.Button("Export Report")
+        btn_export.set_on_clicked(self._on_export_report)
+        self.panel.add_child(btn_export)
+        trial_row = gui.Horiz(4)
+        btn_save_trial = gui.Button("Save Trial")
+        btn_save_trial.set_on_clicked(self._on_save_trial)
+        btn_load_trial = gui.Button("Load Trial")
+        btn_load_trial.set_on_clicked(self._on_load_trial)
+        trial_row.add_child(btn_save_trial)
+        trial_row.add_child(btn_load_trial)
+        self.panel.add_child(trial_row)
+        self.panel.add_child(self._key_lbl("Report: screenshot + HTML with camera config."))
+        self.panel.add_child(self._key_lbl("Trial: full state to resume experiment later."))
+
     def _build_camera_legend_section(self):
         self.panel.add_child(self._section_lbl("[ CAMERA LEGEND ]"))
         self._legend_rows = []
@@ -1756,6 +1775,14 @@ class CameraPlanner:
             self._remove(f"{self._FRUSTUM}_{i}")
             self._remove(f"{self._MARKER}_{i}")
 
+        # Remove previous coordinate labels before redrawing cameras.
+        for lbl in getattr(self, "_camera_coord_labels", []):
+            try:
+                self.scene_widget.remove_3d_label(lbl)
+            except Exception:
+                pass
+        self._camera_coord_labels = []
+
         # draw all cameras
         for i, cam in enumerate(self.cameras):
             base = self._camera_color(i)
@@ -1776,6 +1803,15 @@ class CameraPlanner:
                 build_camera_marker(cam.position, radius=self.camera_marker_radius, color=marker_color),
                 self._mat_unlit(marker_color)
             )
+
+            # Show camera coordinates in the 3D viewing pane near each marker.
+            pos = cam.position
+            label_pos = [float(pos[0]), float(pos[1]), float(pos[2] + self.camera_marker_radius * 1.4)]
+            lbl = self.scene_widget.add_3d_label(
+                label_pos,
+                f"C{i + 1}: ({pos[0]:.0f}, {pos[1]:.0f}, {pos[2]:.0f})")
+            lbl.color = gui.Color(float(marker_color[0]), float(marker_color[1]), float(marker_color[2]))
+            self._camera_coord_labels.append(lbl)
         self._refresh_selection_label()
         self._refresh_camera_legend()
 
@@ -2205,6 +2241,7 @@ class CameraPlanner:
 
             self._last_visible_all = None
             self._last_visible_cam = None
+            self._last_camera_coverages = []
             self._remove(self._COVERAGE)
             self._remove(self._CAMCOVERAGE)
 
@@ -2238,6 +2275,7 @@ class CameraPlanner:
             self.object_scale       = 1.0
             self._last_visible_all  = None
             self._last_visible_cam  = None
+            self._last_camera_coverages = []
             self._remove(self._COVERAGE)
             self._remove(self._CAMCOVERAGE)
             self._remove(self._MESH)
@@ -2878,8 +2916,29 @@ class CameraPlanner:
             stats["camera_coverage"] = 100.0 * stats["camera_visible"] / len(self.surface_pts) if len(self.surface_pts) > 0 else 0.0
             stats["coverage"] = 100.0 * int(visible_all.sum()) / len(self.surface_pts) if len(self.surface_pts) > 0 else 0.0
             stats["visible"] = int(visible_all.sum())
+            per_camera_coverages = []
+            if len(self.surface_pts) > 0:
+                if self.vis_engine is not None:
+                    for i, cam in enumerate(self.cameras):
+                        vis_i = self.vis_engine.compute_visibility(cam, self.surface_pts)
+                        n_vis_i = int(vis_i.sum())
+                        per_camera_coverages.append({
+                            "camera_index": i + 1,
+                            "visible_points": n_vis_i,
+                            "coverage_pct": 100.0 * n_vis_i / len(self.surface_pts),
+                        })
+                else:
+                    for i, cam in enumerate(self.cameras):
+                        vis_i = cam.points_in_image(self.surface_pts)
+                        n_vis_i = int(vis_i.sum())
+                        per_camera_coverages.append({
+                            "camera_index": i + 1,
+                            "visible_points": n_vis_i,
+                            "coverage_pct": 100.0 * n_vis_i / len(self.surface_pts),
+                        })
             self._last_visible_all = visible_all.copy()
             self._last_visible_cam = vis_cam.copy()
+            self._last_camera_coverages = per_camera_coverages
 
             def _finish():
                 self._remove(self._COVERAGE)
@@ -2999,6 +3058,555 @@ class CameraPlanner:
         self._set_chip_mode("Coverage view", "good")
         self._set_chip_coverage(cov)
         self._set_chip_detectability(mmpp)
+
+    # -- Reports & Trials ------------------------------------
+
+    def _build_report_data(self, trial_name: str = "") -> dict:
+        """Assemble all configuration and coverage data for a report or trial."""
+        self._read_camera_ui()
+        state = self._build_project_state()
+
+        cameras_info = []
+        for i, cam in enumerate(self.cameras):
+            sensor_name = self._guess_sensor_size_name(cam.sensor_width)
+            cameras_info.append({
+                "index": i + 1,
+                "sensor_name": sensor_name,
+                "position_mm": cam.position.tolist(),
+                "lookat_mm": cam.lookat.tolist(),
+                "focal_length_mm": float(cam.focal_length),
+                "sensor_width_mm": float(cam.sensor_width),
+                "sensor_height_mm": float(cam.sensor_height),
+                "image_width_px": int(cam.image_width),
+                "image_height_px": int(cam.image_height),
+                "near_mm": float(cam.near),
+                "far_mm": float(cam.far),
+                "fov_h_deg": float(np.degrees(cam.fov_h)),
+                "fov_v_deg": float(np.degrees(cam.fov_v)),
+                "up": cam.up.tolist(),
+            })
+
+        self._read_object_ui()
+        return {
+            "trial_name": trial_name or "Unnamed Trial",
+            "timestamp": self._timestamp_now(),
+            "project_name": self._current_project_name or "Unsaved",
+            "object": {
+                "type": self._mesh_source.get("type", "unknown"),
+                "source": self._mesh_source.get("path", "") or str(self._mesh_source.get("dims", "")),
+                "translation_mm": self.object_translation.tolist(),
+                "rotation_deg": self.object_rotation.tolist(),
+                "scale": float(self.object_scale),
+            },
+            "cameras": cameras_info,
+            "coverage_stats": self._last_stats or {},
+            "camera_coverages": self._last_camera_coverages or [],
+            "defect_size_mm": self._defect_size_mm,
+            "sample_points": int(self._n_samples.int_value),
+            "state": state,  # full project state for trial reload
+        }
+
+    def _cov_class(self, pct: float) -> str:
+        if pct >= 80.0:
+            return "good"
+        if pct >= 50.0:
+            return "warn"
+        return "bad"
+
+    def _mmpp_class(self, mmpp: float) -> str:
+        if mmpp <= 0.25:
+            return "good"
+        if mmpp <= 0.75:
+            return "warn"
+        return "bad"
+
+    def _generate_html_report(self, data: dict, report_images: list) -> str:
+        """Generate a standalone HTML report with configuration images."""
+        ts = data.get("timestamp", "")
+        project = data.get("project_name", "--")
+        trial = data.get("trial_name", "--")
+
+        cameras_html = ""
+        for cam in data.get("cameras", []):
+            pos = cam["position_mm"]
+            lat = cam["lookat_mm"]
+            cameras_html += (
+                f"<tr>"
+                f"<td>{cam['index']}</td>"
+                f"<td>{cam.get('sensor_name', '')}</td>"
+                f"<td>{cam['focal_length_mm']:.1f}</td>"
+                f"<td>{cam['sensor_width_mm']:.2f}</td>"
+                f"<td>{cam['image_width_px']}x{cam['image_height_px']}</td>"
+                f"<td>{cam['fov_h_deg']:.1f}&deg; x {cam['fov_v_deg']:.1f}&deg;</td>"
+                f"<td>{pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f}</td>"
+                f"<td>{lat[0]:.1f}, {lat[1]:.1f}, {lat[2]:.1f}</td>"
+                f"<td>{cam['near_mm']:.0f} - {cam['far_mm']:.0f}</td>"
+                f"</tr>"
+            )
+
+        stats = data.get("coverage_stats", {})
+        obj = data.get("object", {})
+
+        gallery_parts = []
+        for item in (report_images or []):
+            title = str(item.get("title", "Image"))
+            src = str(item.get("src", "")).strip()
+            if not src:
+                continue
+            gallery_parts.append(
+                f"<div class='img-card'><div class='img-title'>{title}</div>"
+                f"<img src=\"{src}\"/></div>")
+        img_section = "".join(gallery_parts) if gallery_parts else "<p><em>No screenshots available.</em></p>"
+
+        obj_trans = obj.get("translation_mm", [0, 0, 0])
+        obj_rot   = obj.get("rotation_deg",   [0, 0, 0])
+
+        coverage_no_stats = "<p><em>Coverage was not computed for this trial.</em></p>"
+        if stats:
+            coverage_table = (
+                f"<table>"
+                f"<tr><th>Metric</th><th>Value</th></tr>"
+                f"<tr><td>Overall Coverage</td>"
+                f"<td class='{self._cov_class(stats.get('coverage', 0))}'>"
+                f"{stats.get('coverage', 0):.2f}%</td></tr>"
+                f"<tr><td>Selected Camera Coverage</td>"
+                f"<td class='{self._cov_class(stats.get('camera_coverage', 0))}'>"
+                f"{stats.get('camera_coverage', 0):.2f}%</td></tr>"
+                f"<tr><td>Overall Visible Points</td><td>{stats.get('visible', 0):,}</td></tr>"
+                f"<tr><td>Selected Camera Visible</td><td>{stats.get('camera_visible', 0):,}</td></tr>"
+                f"<tr><td>Total Sample Points</td><td>{stats.get('total', 0):,}</td></tr>"
+                f"<tr><td>Avg Distance (mm)</td><td>{stats.get('avg_dist', 0):.2f}</td></tr>"
+                f"<tr><td>Resolution (mm/px)</td>"
+                f"<td class='{self._mmpp_class(stats.get('mm_per_px', 0))}'>"
+                f"{stats.get('mm_per_px', 0):.4f}</td></tr>"
+                f"<tr><td>FOV Horizontal</td><td>{stats.get('fov_h_deg', 0):.2f}&deg;</td></tr>"
+                f"<tr><td>FOV Vertical</td><td>{stats.get('fov_v_deg', 0):.2f}&deg;</td></tr>"
+                f"<tr><td>Defect Size (mm)</td><td>{data.get('defect_size_mm', 1.0):.2f}</td></tr>"
+                f"</table>"
+            )
+        else:
+            coverage_table = coverage_no_stats
+
+        camera_cov_rows = ""
+        for row in data.get("camera_coverages", []):
+            camera_cov_rows += (
+                f"<tr><td>Camera {row.get('camera_index', '--')}</td>"
+                f"<td>{int(row.get('visible_points', 0)):,}</td>"
+                f"<td class='{self._cov_class(float(row.get('coverage_pct', 0.0)))}'>"
+                f"{float(row.get('coverage_pct', 0.0)):.2f}%</td></tr>")
+        camera_cov_table = (
+            "<table><tr><th>Camera</th><th>Visible Points</th><th>Coverage</th></tr>"
+            f"{camera_cov_rows}</table>" if camera_cov_rows else "")
+
+        n_cams = len(data.get("cameras", []))
+
+        return (
+            "<!DOCTYPE html>\n"
+            "<html><head><meta charset=\"UTF-8\"/>\n"
+            f"<title>Camera Planner Report - {trial}</title>\n"
+            "<style>\n"
+            "body { font-family: monospace; background: #1a1c1f; color: #d8dce6; margin: 24px; }\n"
+            "h1 { color: #91CFF9; margin-bottom: 4px; }\n"
+            "h2 { color: #91CFF9; border-bottom: 1px solid #333; padding-bottom: 4px; margin-top: 28px; }\n"
+            "table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }\n"
+            "th { background: #252730; color: #c0c8d8; text-align: left; padding: 6px 10px; }\n"
+            "td { padding: 5px 10px; border-bottom: 1px solid #2a2d34; }\n"
+            ".img-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 12px; }\n"
+            ".img-card { border: 1px solid #31343b; border-radius: 6px; background: #17191d; padding: 8px; }\n"
+            ".img-card img { width: 100%; border-radius: 4px; border: 1px solid #444; }\n"
+            ".img-title { color: #c0c8d8; margin-bottom: 6px; }\n"
+            ".good { color: #66e699; font-weight: bold; }\n"
+            ".warn { color: #f0d44a; font-weight: bold; }\n"
+            ".bad  { color: #ee5555; font-weight: bold; }\n"
+            ".meta { color: #888; font-size: 0.9em; }\n"
+            "</style></head>\n"
+            "<body>\n"
+            f"<h1>Camera Coverage Report</h1>\n"
+            f"<p class=\"meta\">Project: <strong>{project}</strong> &nbsp;|&nbsp; "
+            f"Trial: <strong>{trial}</strong> &nbsp;|&nbsp; Generated: {ts}</p>\n"
+            "<h2>Configuration Images</h2>\n"
+            f"<div class='img-grid'>{img_section}</div>\n"
+            "<h2>Object</h2>\n"
+            "<table><tr><th>Property</th><th>Value</th></tr>\n"
+            f"<tr><td>Type</td><td>{obj.get('type', '--')}</td></tr>\n"
+            f"<tr><td>Source</td><td>{obj.get('source', '--')}</td></tr>\n"
+            f"<tr><td>Translation (mm)</td>"
+            f"<td>X={obj_trans[0]:.2f}, Y={obj_trans[1]:.2f}, Z={obj_trans[2]:.2f}</td></tr>\n"
+            f"<tr><td>Rotation (deg)</td>"
+            f"<td>Rx={obj_rot[0]:.2f}, Ry={obj_rot[1]:.2f}, Rz={obj_rot[2]:.2f}</td></tr>\n"
+            f"<tr><td>Scale</td><td>{obj.get('scale', 1.0):.4f}</td></tr>\n"
+            "</table>\n"
+            f"<h2>Camera Configurations ({n_cams} camera(s))</h2>\n"
+            "<table>\n"
+            "<tr><th>#</th><th>Sensor</th><th>FL&nbsp;(mm)</th>"
+            "<th>Sensor&nbsp;W&nbsp;(mm)</th><th>Resolution</th>"
+            "<th>FOV H x V</th><th>Position (mm)</th>"
+            "<th>Look-At (mm)</th><th>Near-Far (mm)</th></tr>\n"
+            f"{cameras_html}\n"
+            "</table>\n"
+            "<h2>Coverage Statistics</h2>\n"
+            f"{coverage_table}\n"
+            f"{camera_cov_table}\n"
+            "</body></html>"
+        )
+
+    def _report_output_dir(self, subdir: str, ts_slug: str) -> str:
+        """Return path for a report/trial output directory."""
+        if self._current_project_path and \
+                os.path.basename(self._current_project_path).lower() == "project.json":
+            base = os.path.join(os.path.dirname(self._current_project_path), subdir)
+        elif self._current_project_name:
+            slug = self._slugify_project_name(self._current_project_name)
+            base = os.path.join(self._projects_root, slug, subdir)
+        else:
+            base = os.path.join(self._workspace_root, subdir)
+        return os.path.join(base, ts_slug)
+
+    def _build_report_images(self, image, out_dir: str) -> list:
+        """Save multiple report images from current view and return relative references."""
+        images = []
+        overview_path = os.path.join(out_dir, "scene_overview.png")
+        focus_path = os.path.join(out_dir, "scene_focus.png")
+        try:
+            o3d.io.write_image(overview_path, image)
+            images.append({"title": "Scene Overview", "src": "scene_overview.png"})
+        except Exception:
+            pass
+
+        try:
+            arr = np.asarray(image)
+            if arr.ndim == 3 and arr.shape[0] > 20 and arr.shape[1] > 20:
+                h, w = arr.shape[0], arr.shape[1]
+                y0, y1 = int(h * 0.2), int(h * 0.8)
+                x0, x1 = int(w * 0.2), int(w * 0.8)
+                crop = np.ascontiguousarray(arr[y0:y1, x0:x1, :])
+                focus_img = o3d.geometry.Image(crop)
+                o3d.io.write_image(focus_path, focus_img)
+                images.append({"title": "Center Focus", "src": "scene_focus.png"})
+        except Exception:
+            pass
+        return images
+
+    def _collect_manual_report_images(self, out_dir: str, auto_names: set[str]) -> list:
+        """Collect user-provided screenshots from report dir and manual_images folder."""
+        items = []
+        seen = set()
+        search_dirs = [out_dir, os.path.join(os.path.dirname(out_dir), "manual_images")]
+        for d in search_dirs:
+            if not os.path.isdir(d):
+                continue
+            for name in sorted(os.listdir(d)):
+                lower = name.lower()
+                if not (lower.endswith(".png") or lower.endswith(".jpg") or
+                        lower.endswith(".jpeg") or lower.endswith(".webp")):
+                    continue
+                if name in auto_names:
+                    continue
+                abs_path = os.path.join(d, name)
+                if not os.path.isfile(abs_path):
+                    continue
+                rel_src = os.path.relpath(abs_path, out_dir).replace("\\", "/")
+                key = rel_src.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                items.append({"title": f"Manual - {name}", "src": rel_src})
+            return items
+
+    def _on_export_report(self):
+        """Export a report: configuration images + HTML + JSON summary."""
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_dir = self._report_output_dir("reports", ts)
+        os.makedirs(report_dir, exist_ok=True)
+        data = self._build_report_data(trial_name=f"Report {ts}")
+
+        def _write_report_files(report_images):
+            try:
+                auto_names = {item.get("src", "") for item in (report_images or [])}
+                report_images = list(report_images or []) + self._collect_manual_report_images(report_dir, auto_names)
+                summary = {k: v for k, v in data.items() if k != "state"}
+                report_json = os.path.join(report_dir, "report.json")
+                with open(report_json, "w", encoding="utf-8") as f:
+                    json.dump(summary, f, indent=2)
+                html = self._generate_html_report(data, report_images)
+                report_html = os.path.join(report_dir, "report.html")
+                with open(report_html, "w", encoding="utf-8") as f:
+                    f.write(html)
+                rel = os.path.relpath(report_dir, self._workspace_root)
+                gui.Application.instance.post_to_main_thread(
+                    self.win, lambda r=rel: self._set_status(f"Report saved: {r}"))
+                try:
+                    subprocess.Popen(["explorer", os.path.abspath(report_dir)])
+                except Exception:
+                    pass
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                gui.Application.instance.post_to_main_thread(
+                    self.win, lambda err=str(e): self._set_status(f"Report error: {err}"))
+
+        def _on_image(image):
+            try:
+                report_images = self._build_report_images(image, report_dir)
+                threading.Thread(target=_write_report_files, args=(report_images,), daemon=True).start()
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                threading.Thread(target=_write_report_files, args=([],), daemon=True).start()
+
+        try:
+            self.scene_widget.scene.render_to_image(_on_image)
+        except Exception:
+            threading.Thread(target=_write_report_files, args=([],), daemon=True).start()
+        self._set_status("Rendering screenshot for report...")
+
+    def _on_save_trial(self):
+        """Open dialog to name and save a trial (full state + screenshot + report)."""
+        dlg = gui.Dialog("Save Trial")
+        layout = gui.Vert(6)
+        layout.add_child(self._key_lbl("Trial name"))
+        self._trial_name_input = gui.TextEdit()
+        ts_display = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._trial_name_input.placeholder_text = "Enter trial name"
+        self._trial_name_input.text_value = f"Trial {ts_display}"
+        layout.add_child(self._trial_name_input)
+        note = gui.Label(
+            "Saves complete state + coverage results.\n"
+            "Load it later to resume this exact experiment.")
+        note.text_color = self._ui["muted"]
+        layout.add_child(note)
+        btn_row = gui.Horiz(4)
+        btn_save = gui.Button("Save")
+        btn_save.set_on_clicked(self._do_save_trial)
+        btn_cancel = gui.Button("Cancel")
+        btn_cancel.set_on_clicked(lambda: self.win.close_dialog())
+        btn_row.add_child(btn_save)
+        btn_row.add_child(btn_cancel)
+        layout.add_child(btn_row)
+        layout.preferred_width = 440
+        dlg.add_child(layout)
+        self.win.show_dialog(dlg)
+
+    def _do_save_trial(self):
+        """Perform the trial save after dialog confirmation."""
+        trial_name = (self._trial_name_input.text_value.strip()
+                      or f"Trial {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        self.win.close_dialog()
+
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        trial_slug = self._slugify_project_name(trial_name)[:40]
+        trial_folder_name = f"{ts}_{trial_slug}"
+        trial_dir = self._report_output_dir("trials", trial_folder_name)
+        os.makedirs(trial_dir, exist_ok=True)
+
+        data = self._build_report_data(trial_name=trial_name)
+
+        def _write_trial_files(report_images):
+            try:
+                auto_names = {item.get("src", "") for item in (report_images or [])}
+                report_images = list(report_images or []) + self._collect_manual_report_images(trial_dir, auto_names)
+                trial_json = os.path.join(trial_dir, "trial.json")
+                with open(trial_json, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                html = self._generate_html_report(data, report_images)
+                report_html = os.path.join(trial_dir, "report.html")
+                with open(report_html, "w", encoding="utf-8") as f:
+                    f.write(html)
+                rel = os.path.relpath(trial_dir, self._workspace_root)
+                tname = trial_name
+                gui.Application.instance.post_to_main_thread(
+                    self.win, lambda r=rel, n=tname: self._set_status(f"Trial saved: {n}  ({r})"))
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                gui.Application.instance.post_to_main_thread(
+                    self.win, lambda err=str(e): self._set_status(f"Trial save error: {err}"))
+
+        def _on_image(image):
+            try:
+                report_images = self._build_report_images(image, trial_dir)
+                threading.Thread(target=_write_trial_files, args=(report_images,), daemon=True).start()
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                threading.Thread(target=_write_trial_files, args=([],), daemon=True).start()
+
+        try:
+            self.scene_widget.scene.render_to_image(_on_image)
+        except Exception:
+            threading.Thread(target=_write_trial_files, args=([],), daemon=True).start()
+        self._set_status("Saving trial...")
+
+    def _list_trials(self) -> list:
+        """List all saved trials for the current project, sorted newest-first."""
+        trials_dirs = []
+
+        if self._current_project_path and \
+                os.path.basename(self._current_project_path).lower() == "project.json":
+            d = os.path.join(os.path.dirname(self._current_project_path), "trials")
+            if os.path.isdir(d):
+                trials_dirs.append(d)
+
+        if self._current_project_name:
+            slug = self._slugify_project_name(self._current_project_name)
+            d2 = os.path.join(self._projects_root, slug, "trials")
+            if os.path.isdir(d2) and d2 not in trials_dirs:
+                trials_dirs.append(d2)
+
+        # Fallback: workspace root trials folder
+        d3 = os.path.join(self._workspace_root, "trials")
+        if os.path.isdir(d3) and d3 not in trials_dirs:
+            trials_dirs.append(d3)
+
+        trials = []
+        for tdir in trials_dirs:
+            for entry in os.scandir(tdir):
+                if not entry.is_dir():
+                    continue
+                trial_json = os.path.join(entry.path, "trial.json")
+                if not os.path.exists(trial_json):
+                    continue
+                try:
+                    with open(trial_json, "r", encoding="utf-8") as f:
+                        trial_data = json.load(f)
+                    trial_data["_trial_dir"] = entry.path
+                    trial_data["_trial_json"] = trial_json
+                    screenshot = os.path.join(entry.path, "scene_overview.png")
+                    trial_data["_has_screenshot"] = os.path.exists(screenshot)
+                    trials.append(trial_data)
+                except Exception:
+                    continue
+
+        trials.sort(key=lambda t: t.get("timestamp", ""), reverse=True)
+        return trials
+
+    def _on_load_trial(self):
+        """Browse saved trials and load one back into the tool."""
+        trials = self._list_trials()
+
+        dlg = gui.Dialog("Load Trial")
+        layout = gui.Vert(6)
+
+        if not trials:
+            layout.add_child(self._key_lbl("No trials found for this project."))
+            layout.add_child(self._key_lbl("Use 'Save Trial' to create one."))
+            btn_close = gui.Button("Close")
+            btn_close.set_on_clicked(lambda: self.win.close_dialog())
+            layout.add_child(btn_close)
+            layout.preferred_width = 420
+            dlg.add_child(layout)
+            self.win.show_dialog(dlg)
+            return
+
+        proj_name = self._current_project_name or "Unsaved"
+        layout.add_child(self._key_lbl(f"Trials for: {proj_name}"))
+
+        self._trial_browser_items = trials
+        labels = []
+        for t in trials:
+            ts = t.get("timestamp", "--")[:16]
+            name = t.get("trial_name", "--")
+            stats = t.get("coverage_stats", {})
+            cov = stats.get("coverage", None)
+            cov_str = f"  cov={cov:.1f}%" if cov is not None else ""
+            labels.append(f"{name}  |  {ts}{cov_str}")
+
+        self._trial_list_view = gui.ListView()
+        self._trial_list_view.set_items(labels)
+        self._trial_list_view.set_max_visible_items(12)
+        self._trial_list_view.set_on_selection_changed(self._on_trial_selection_changed)
+        layout.add_child(self._trial_list_view)
+
+        self._trial_detail_label = gui.Label("Select a trial to see details.")
+        self._trial_detail_label.text_color = self._ui["muted"]
+        layout.add_child(self._trial_detail_label)
+
+        if trials:
+            self._trial_list_view.selected_index = 0
+            self._update_trial_detail(trials[0])
+
+        btn_row = gui.Horiz(4)
+        btn_load = gui.Button("Load Selected")
+        btn_load.set_on_clicked(self._on_trial_load_clicked)
+        btn_close = gui.Button("Close")
+        btn_close.set_on_clicked(lambda: self.win.close_dialog())
+        btn_row.add_child(btn_load)
+        btn_row.add_child(btn_close)
+        layout.add_child(btn_row)
+
+        layout.preferred_width = 560
+        dlg.add_child(layout)
+        self.win.show_dialog(dlg)
+
+    def _on_trial_selection_changed(self, _val, is_double_click):
+        idx = int(getattr(self._trial_list_view, "selected_index", -1))
+        if 0 <= idx < len(self._trial_browser_items):
+            self._update_trial_detail(self._trial_browser_items[idx])
+            if is_double_click:
+                self._load_trial_from_data(self._trial_browser_items[idx])
+
+    def _update_trial_detail(self, trial: dict):
+        if not hasattr(self, "_trial_detail_label"):
+            return
+        stats = trial.get("coverage_stats", {})
+        obj   = trial.get("object", {})
+        n_cams = len(trial.get("cameras", []))
+        has_screenshot = trial.get("_has_screenshot", False)
+        cov = stats.get("coverage", None)
+        cam_cov = stats.get("camera_coverage", None)
+        mmpp = stats.get("mm_per_px", None)
+
+        lines = [
+            f"Trial: {trial.get('trial_name', '--')}",
+            f"Time:  {trial.get('timestamp', '--')}",
+            f"Object: {obj.get('type', '--')} - {obj.get('source', '--')}",
+            f"Cameras: {n_cams}",
+        ]
+        if cov is not None:
+            lines.append(f"Coverage: {cov:.1f}%   Camera: {cam_cov:.1f}%")
+        else:
+            lines.append("Coverage: not computed")
+        if mmpp is not None:
+            lines.append(f"Resolution: {mmpp:.4f} mm/px")
+        lines.append(f"Screenshot: {'yes' if has_screenshot else 'no'}")
+
+        self._trial_detail_label.text = "\n".join(lines)
+
+    def _on_trial_load_clicked(self):
+        idx = int(getattr(self._trial_list_view, "selected_index", -1))
+        if 0 <= idx < len(self._trial_browser_items):
+            self._load_trial_from_data(self._trial_browser_items[idx])
+        else:
+            self._set_status("No trial selected.")
+
+    def _load_trial_from_data(self, trial_data: dict):
+        """Restore full tool state from a saved trial."""
+        self.win.close_dialog()
+        try:
+            state = trial_data.get("state", {})
+            if not state:
+                self._set_status("Trial has no state data.")
+                return
+
+            import tempfile
+            with tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".json", delete=False, encoding="utf-8") as tf:
+                json.dump(state, tf)
+                temp_path = tf.name
+
+            try:
+                self._load_project_from_path(temp_path, show_status=False)
+            finally:
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+
+            # Restore coverage statistics display if available
+            stats = trial_data.get("coverage_stats", {})
+            if stats:
+                self._last_stats = dict(stats)
+                self._show_stats(stats)
+
+            self._set_status(f"Trial loaded: {trial_data.get('trial_name', '--')}")
+        except Exception as e:
+            self._set_status(f"Load trial failed: {e}")
 
     def run(self):
         self.app.run()
