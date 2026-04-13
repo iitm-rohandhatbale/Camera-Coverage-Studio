@@ -1,0 +1,247 @@
+{
+  "trial_name": "Brezing_Simulation_3CAM",
+  "timestamp": "2026-04-10T13:08:24",
+  "project_name": "Brezing_Simulation_3CAM",
+  "object": {
+    "type": "mesh",
+    "source": "C:\\Prem_Varma\\Camera-Coverage-Studio\\pipe_structure (2).glb",
+    "translation_mm": [
+      8.0,
+      0.0,
+      35.0
+    ],
+    "rotation_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 0.15
+  },
+  "cameras": [
+    {
+      "index": 1,
+      "sensor_name": "1/2.8\" (Basler)",
+      "position_mm": [
+        -70.0,
+        35.0,
+        70.0
+      ],
+      "lookat_mm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length_mm": 3.0,
+      "sensor_width_mm": 4.8,
+      "sensor_height_mm": 2.6999999999999997,
+      "image_width_px": 3840,
+      "image_height_px": 2160,
+      "near_mm": 10.0,
+      "far_mm": 120.0,
+      "fov_h_deg": 77.31961650818018,
+      "fov_v_deg": 48.45549063590834,
+      "up": [
+        1.0,
+        6.123233995736766e-17,
+        0.0
+      ]
+    },
+    {
+      "index": 2,
+      "sensor_name": "1/2.8\" (Basler)",
+      "position_mm": [
+        70.0,
+        35.0,
+        70.0
+      ],
+      "lookat_mm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length_mm": 3.0,
+      "sensor_width_mm": 4.8,
+      "sensor_height_mm": 2.6999999999999997,
+      "image_width_px": 3840,
+      "image_height_px": 2160,
+      "near_mm": 10.0,
+      "far_mm": 120.0,
+      "fov_h_deg": 77.31961650818018,
+      "fov_v_deg": 48.45549063590834,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 3,
+      "sensor_name": "1/2.8\" (Basler)",
+      "position_mm": [
+        0.0,
+        -70.0,
+        70.0
+      ],
+      "lookat_mm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length_mm": 3.0,
+      "sensor_width_mm": 4.8,
+      "sensor_height_mm": 2.6999999999999997,
+      "image_width_px": 3840,
+      "image_height_px": 2160,
+      "near_mm": 10.0,
+      "far_mm": 120.0,
+      "fov_h_deg": 77.31961650818018,
+      "fov_v_deg": 48.45549063590834,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "coverage_stats": {
+    "total": 20000,
+    "visible": 9748,
+    "coverage": 48.74,
+    "avg_dist": 94.93986884311234,
+    "mm_per_px": 0.03955827868463014,
+    "fov_h_deg": 77.31961650818018,
+    "fov_v_deg": 48.45549063590834,
+    "camera_visible": 5993,
+    "camera_coverage": 29.965
+  },
+  "camera_coverages": [
+    {
+      "camera_index": 1,
+      "visible_points": 5993,
+      "coverage_pct": 29.965
+    },
+    {
+      "camera_index": 2,
+      "visible_points": 5568,
+      "coverage_pct": 27.84
+    },
+    {
+      "camera_index": 3,
+      "visible_points": 4402,
+      "coverage_pct": 22.01
+    }
+  ],
+  "defect_size_mm": 1.0,
+  "sample_points": 20000,
+  "state": {
+    "version": 1,
+    "mesh": {
+      "type": "mesh",
+      "path": "C:\\Prem_Varma\\Camera-Coverage-Studio\\pipe_structure (2).glb"
+    },
+    "object": {
+      "translation": [
+        8.0,
+        0.0,
+        35.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": 0.15
+    },
+    "cameras": [
+      {
+        "position": [
+          -70.0,
+          35.0,
+          70.0
+        ],
+        "lookat": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "focal_length": 3.0,
+        "sensor_width": 4.8,
+        "image_width": 3840,
+        "image_height": 2160,
+        "near": 10.0,
+        "far": 120.0,
+        "up": [
+          1.0,
+          6.123233995736766e-17,
+          0.0
+        ]
+      },
+      {
+        "position": [
+          70.0,
+          35.0,
+          70.0
+        ],
+        "lookat": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "focal_length": 3.0,
+        "sensor_width": 4.8,
+        "image_width": 3840,
+        "image_height": 2160,
+        "near": 10.0,
+        "far": 120.0,
+        "up": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "position": [
+          0.0,
+          -70.0,
+          70.0
+        ],
+        "lookat": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "focal_length": 3.0,
+        "sensor_width": 4.8,
+        "image_width": 3840,
+        "image_height": 2160,
+        "near": 10.0,
+        "far": 120.0,
+        "up": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    ],
+    "camera_colors": [
+      [
+        1.0,
+        0.9873417615890503,
+        0.0
+      ],
+      [
+        1.0,
+        0.0,
+        0.7341771125793457
+      ],
+      [
+        0.0,
+        0.1772153377532959,
+        1.0
+      ]
+    ],
+    "active_camera_idx": 2,
+    "sample_points": 20000,
+    "camera_marker_radius": 2.0
+  }
+}

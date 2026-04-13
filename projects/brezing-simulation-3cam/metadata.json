@@ -1,0 +1,11 @@
+{
+  "name": "Brezing_Simulation_3CAM",
+  "slug": "brezing-simulation-3cam",
+  "created_at": "2026-04-10T13:08:05",
+  "updated_at": "2026-04-10T13:08:05",
+  "project_file": "projects\\brezing-simulation-3cam\\project.json",
+  "object_type": "mesh",
+  "object_source": "pipe_structure (2).glb",
+  "camera_count": 3,
+  "sample_points": 20000
+}

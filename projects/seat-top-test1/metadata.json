@@ -1,0 +1,11 @@
+{
+  "name": "Seat_Top_Test1",
+  "slug": "seat-top-test1",
+  "created_at": "2026-04-09T12:16:10",
+  "updated_at": "2026-04-09T12:16:10",
+  "project_file": "projects\\seat-top-test1\\project.json",
+  "object_type": "mesh",
+  "object_source": "Seat Top.glb",
+  "camera_count": 3,
+  "sample_points": 20000
+}

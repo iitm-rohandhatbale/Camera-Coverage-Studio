@@ -1,0 +1,11 @@
+{
+  "name": "Wheel_Simulation_3",
+  "slug": "wheel-simulation-3",
+  "created_at": "2026-04-07T16:31:11",
+  "updated_at": "2026-04-07T16:31:11",
+  "project_file": "projects\\wheel-simulation-3\\project.json",
+  "object_type": "mesh",
+  "object_source": "Wheel Mesh.glb",
+  "camera_count": 2,
+  "sample_points": 20000
+}

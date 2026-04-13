@@ -394,15 +394,19 @@ class CameraPlanner:
         self.app = gui.Application.instance
         self.app.initialize()
 
-        # Pass 1 UI tokens: consistent colors and visual hierarchy.
+        # UI design tokens
         self._ui = {
-            "panel_bg": gui.Color(0.13, 0.14, 0.16),
-            "section": gui.Color(0.57, 0.80, 0.98),
-            "key": gui.Color(0.76, 0.78, 0.82),
-            "value": gui.Color(0.98, 0.94, 0.64),
-            "muted": gui.Color(0.55, 0.57, 0.62),
-            "subtle": gui.Color(0.45, 0.47, 0.52),
-            "accent": gui.Color(0.40, 0.84, 0.56),
+            "panel_bg":  gui.Color(0.14, 0.15, 0.17),   # very dark slate
+            "card_bg":   gui.Color(0.18, 0.19, 0.21),   # card surface
+            "section":   gui.Color(0.45, 0.78, 1.00),   # bright sky-blue header
+            "key":       gui.Color(0.70, 0.72, 0.78),   # muted grey key
+            "value":     gui.Color(1.00, 0.92, 0.55),   # warm yellow value
+            "muted":     gui.Color(0.50, 0.51, 0.56),   # dim hint text
+            "subtle":    gui.Color(0.38, 0.40, 0.45),   # very dim
+            "accent":    gui.Color(0.35, 0.90, 0.60),   # green accent
+            "good":      gui.Color(0.30, 0.90, 0.50),
+            "warn":      gui.Color(0.98, 0.82, 0.25),
+            "bad":       gui.Color(0.95, 0.30, 0.30),
         }
 
         # Use the default font - importantly, do NOT use any Unicode glyphs
@@ -414,44 +418,45 @@ class CameraPlanner:
 
         # MacBook M1 13": logical 1280x800.
         self.win = self.app.create_window(
-            "Camera Coverage & Planning Tool", 1600, 920)
+            "Camera Coverage Studio  |  v3", 1700, 960)
         self.win.set_on_layout(self._on_layout)
         self.win.set_on_close(self._on_close)
 
         # -- 3D scene -----------------------------------------
         self.scene_widget = gui.SceneWidget()
         self.scene_widget.scene = rendering.Open3DScene(self.win.renderer)
-        self.scene_widget.scene.set_background([0.94, 0.95, 0.97, 1.0])
+        self.scene_widget.scene.set_background([0.17, 0.18, 0.20, 1.0])
         self.scene_widget.enable_scene_caching(False)
         self.scene_widget.set_view_controls(
             gui.SceneWidget.Controls.ROTATE_CAMERA)
         
         self.scene_widget.set_on_mouse(self._on_mouse)
 
-        # -- Left scrollable panel ----------------------------
-        m = int(0.7 * self.em)
-        self.panel = gui.ScrollableVert(
-            int(0.45 * self.em), gui.Margins(m, m, m, m))
-        try:
-            self.panel.background_color = self._ui["panel_bg"]
-        except Exception:
-            pass
+        # ─── Left panel (tab control) ─────────────────────────────────────────────
+        _m = 5
+        self.tabs = gui.TabControl()
 
+        # TAB 1 ── World
+        self.panel = gui.ScrollableVert(6, gui.Margins(_m, _m, _m, _m))
         self._build_project_section()
-        self.panel.add_child(self._hsep())
         self._build_mesh_section()
-        self.panel.add_child(self._hsep())
         self._build_object_section()
-        self.panel.add_child(self._hsep())
-        self._build_camera_section()
-        self.panel.add_child(self._hsep())
-        self._build_action_section()
-        self.panel.add_child(self._hsep())
-        self._build_stats_section()
-        self.panel.add_child(self._hsep())
-        self._build_nav_section()
+        self.tabs.add_tab("World", self.panel)
 
-        self.win.add_child(self.panel)
+        # TAB 2 ── Cameras
+        self.panel = gui.ScrollableVert(6, gui.Margins(_m, _m, _m, _m))
+        self._build_camera_legend_section()
+        self._build_camera_section()
+        self.tabs.add_tab("Cameras", self.panel)
+
+        # TAB 3 ── Analysis
+        self.panel = gui.ScrollableVert(6, gui.Margins(_m, _m, _m, _m))
+        self._build_action_section()
+        self._build_stats_section()
+        self._build_nav_section()
+        self.tabs.add_tab("Analysis", self.panel)
+
+        self.win.add_child(self.tabs)
         self.win.add_child(self.scene_widget)
 
         self._add_reference_grid(size=8000.0, n=16)
@@ -474,8 +479,8 @@ class CameraPlanner:
 
     def _on_layout(self, _ctx):
         r  = self.win.content_rect
-        pw = max(320, min(420, int(r.width * 0.28)))
-        self.panel.frame        = gui.Rect(r.x, r.y, pw, r.height)
+        pw = max(340, min(400, int(r.width * 0.27)))
+        self.tabs.frame        = gui.Rect(r.x, r.y, pw, r.height)
         self.scene_widget.frame = gui.Rect(r.x + pw, r.y, r.width - pw, r.height)
 
     def _on_close(self):
@@ -486,14 +491,12 @@ class CameraPlanner:
     # -- UI primitives ----------------------------------------
 
     def _hsep(self):
-        """Plain-ASCII separator line - no Unicode box-drawing characters."""
-        lbl = gui.Label("----------------------------------------")
-        lbl.text_color = self._ui["subtle"]
+        """Subtle separator."""
+        lbl = gui.Label(" ")
         return lbl
 
     def _section_lbl(self, text: str) -> gui.Label:
-        """Section header - plain ASCII brackets, no Unicode bullets."""
-        lbl = gui.Label(text)
+        lbl = gui.Label(text.upper())
         lbl.text_color = self._ui["section"]
         return lbl
 
@@ -529,23 +532,26 @@ class CameraPlanner:
         return row
 
     def _xyz_block(self, label: str, vals) -> tuple:
-        """
-        Vertical block: label row then [X ne][Y ne][Z ne].
-        Each NumberEdit 62 px wide - fits 3 across in 275 px panel.
-        Returns (container, (ne_x, ne_y, ne_z)).
-        """
+        """Compact XYZ input row – label + three coloured number edits."""
         vert = gui.Vert(2)
-        vert.add_child(self._key_lbl(label))
-        row = gui.Horiz(3)
+        lbl = gui.Label(label)
+        lbl.text_color = self._ui["key"]
+        vert.add_child(lbl)
+        row = gui.Horiz(4)
         widgets = []
-        for axis, val in zip(("X", "Y", "Z"), vals):
-            sub = gui.Horiz(2)
+        axis_colors = [
+            gui.Color(1.00, 0.40, 0.40),   # X – red
+            gui.Color(0.40, 0.95, 0.40),   # Y – green
+            gui.Color(0.40, 0.60, 1.00),   # Z – blue
+        ]
+        for axis, val, col in zip(("X", "Y", "Z"), vals, axis_colors):
             al = gui.Label(axis)
-            al.text_color = self._ui["accent"]
+            al.text_color = col
             ne = gui.NumberEdit(gui.NumberEdit.DOUBLE)
             ne.double_value = float(val)
-            ne.decimal_precision = 3
-            ne.set_preferred_width(62)
+            ne.decimal_precision = 2
+            ne.set_preferred_width(54)
+            sub = gui.Horiz(2)
             sub.add_child(al)
             sub.add_child(ne)
             row.add_child(sub)
@@ -675,80 +681,94 @@ class CameraPlanner:
     def _refresh_selection_label(self):
         if self.selected_type == "camera":
             c = self._camera_color(self.active_camera_idx)
-            self._selection_label.text = f"Selected: Camera {self.active_camera_idx + 1}"
-            self._selection_label.text_color = gui.Color(0.20, 0.20, 0.20)
-            self._selection_dot.text = "###"
+            self._selection_label.text = f"Camera {self.active_camera_idx + 1}  (active)"
+            self._selection_label.text_color = self._ui["value"]
+            self._selection_dot.text = "[*]"
             self._selection_dot.text_color = gui.Color(float(c[0]), float(c[1]), float(c[2]))
         else:
-            self._selection_label.text = "Selected: Scene object"
+            self._selection_label.text = "Scene Object  (active)"
             self._selection_label.text_color = gui.Color(0.86, 0.86, 0.60)
-            self._selection_dot.text = "---"
+            self._selection_dot.text = "[ ]"
             self._selection_dot.text_color = gui.Color(0.60, 0.60, 0.60)
         self._refresh_camera_legend()
 
     def _build_project_section(self):
-        self.panel.add_child(self._section_lbl("[ PROJECT ]"))
-        self.panel.add_child(self._key_lbl("Manage session/project state."))
+        col = gui.CollapsableVert("  PROJECT", 6, gui.Margins(6, 6, 6, 6))
 
-        btn_row = gui.Horiz(4)
-        btn_new_proj = gui.Button("New")
-        btn_new_proj.set_on_clicked(self._on_new_project)
-        btn_save_proj = gui.Button("Save")
-        btn_save_proj.set_on_clicked(self._on_save_project)
-        btn_load_proj = gui.Button("Load")
-        btn_load_proj.set_on_clicked(self._on_load_project)
-        btn_row.add_child(btn_new_proj)
-        btn_row.add_child(btn_save_proj)
-        btn_row.add_child(btn_load_proj)
-        self.panel.add_child(btn_row)
+        self._proj_name_lbl = gui.Label("No project loaded")
+        self._proj_name_lbl.text_color = self._ui["value"]
+        col.add_child(self._proj_name_lbl)
+
+        btn_row = gui.Horiz(6)
+        for label, cb in [("New", self._on_new_project),
+                          ("Save", self._on_save_project),
+                          ("Load", self._on_load_project)]:
+            btn = gui.Button(label)
+            btn.set_on_clicked(cb)
+            btn_row.add_child(btn)
+        col.add_child(btn_row)
+        self.panel.add_child(col)
 
     def _build_object_section(self):
-        self.panel.add_child(self._section_lbl("[ OBJECT TRANSFORM ]"))
+        col = gui.CollapsableVert("  OBJECT TRANSFORM", 6, gui.Margins(6, 6, 6, 6))
 
         pos_block, (self._ox, self._oy, self._oz) = self._xyz_block(
             "Position (mm)", self.object_translation)
-        self.panel.add_child(pos_block)
+        col.add_child(pos_block)
 
         rot_block, (self._orx, self._ory, self._orz) = self._xyz_block(
             "Rotation (deg)", self.object_rotation)
-        self.panel.add_child(rot_block)
+        col.add_child(rot_block)
 
         step_row = gui.Horiz(4)
-        step_row.add_child(self._key_lbl("Rotate step (deg)"))
+        step_row.add_child(self._key_lbl("Rotate step (deg):"))
         step_row.add_stretch()
-        self._rot_step = self._float_ne(15.0, 64)
+        self._rot_step = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._rot_step.double_value = 15.0
+        self._rot_step.decimal_precision = 1
+        self._rot_step.set_preferred_width(62)
         step_row.add_child(self._rot_step)
-        self.panel.add_child(step_row)
+        col.add_child(step_row)
 
-        # Quick rotate buttons for common object orientation tweaks.
+        # Quick rotate buttons for X Y Z
         for axis in ("X", "Y", "Z"):
-            row = gui.Horiz(4)
-            row.add_child(self._key_lbl(f"Rotate {axis}"))
-            row.add_stretch()
-            btn_minus = gui.Button(f"{axis}-")
-            btn_plus = gui.Button(f"{axis}+")
-            btn_minus.set_on_clicked(lambda a=axis: self._on_quick_rotate(a, -1.0))
-            btn_plus.set_on_clicked(lambda a=axis: self._on_quick_rotate(a, +1.0))
-            row.add_child(btn_minus)
-            row.add_child(btn_plus)
-            self.panel.add_child(row)
+            r = gui.Horiz(4)
+            lbl = gui.Label(f"Rotate {axis}")
+            lbl.text_color = self._ui["key"]
+            r.add_child(lbl)
+            r.add_stretch()
+            bm = gui.Button(f"{axis}-")
+            bp = gui.Button(f"{axis}+")
+            bm.set_on_clicked(lambda a=axis: self._on_quick_rotate(a, -1.0))
+            bp.set_on_clicked(lambda a=axis: self._on_quick_rotate(a, +1.0))
+            r.add_child(bm)
+            r.add_child(bp)
+            col.add_child(r)
 
-        self._oscale = self._float_ne(self.object_scale, 78)
-        self.panel.add_child(self._kv_row("Scale", self._oscale))
+        scale_row = gui.Horiz(4)
+        scale_row.add_child(self._key_lbl("Scale:"))
+        scale_row.add_stretch()
+        self._oscale = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._oscale.double_value = self.object_scale
+        self._oscale.decimal_precision = 4
+        self._oscale.set_preferred_width(78)
+        scale_row.add_child(self._oscale)
+        col.add_child(scale_row)
 
-        # Quick scale buttons for common adjustments
-        scale_btn_row = gui.Horiz(4)
-        scale_btn_row.add_child(self._key_lbl("Quick scale:"))
-        scale_btn_row.add_stretch()
-        for factor_label, factor in [("0.5x", 0.5), ("1x", 1.0), ("2x", 2.0)]:
-            btn = gui.Button(factor_label)
-            btn.set_on_clicked(lambda f=factor: self._on_quick_scale(f))
-            scale_btn_row.add_child(btn)
-        self.panel.add_child(scale_btn_row)
+        qs_row = gui.Horiz(6)
+        qs_row.add_child(self._key_lbl("Quick scale:"))
+        qs_row.add_stretch()
+        for fl, label in ((0.5, "0.5x"), (1.0, "Reset"), (2.0, "2x")):
+            b = gui.Button(label)
+            b.set_on_clicked(lambda f=fl: self._on_quick_scale(f))
+            qs_row.add_child(b)
+        col.add_child(qs_row)
 
-        btn_obj = gui.Button("Update Object")
-        btn_obj.set_on_clicked(self._on_update_object)
-        self.panel.add_child(btn_obj)
+        apply_btn = gui.Button("Apply Transform")
+        apply_btn.set_on_clicked(self._on_update_object)
+        col.add_child(apply_btn)
+
+        self.panel.add_child(col)
 
     def _update_camera_panel(self):
         cam = self._cam()
@@ -758,16 +778,20 @@ class CameraPlanner:
         self._lx.double_value = float(cam.lookat[0])
         self._ly.double_value = float(cam.lookat[1])
         self._lz.double_value = float(cam.lookat[2])
-        self._fl.double_value = float(cam.focal_length)
-        self._sw.double_value = float(cam.sensor_width)
-        self._rw.int_value = int(cam.image_width)
-        self._rh.int_value = int(cam.image_height)
+        self._fl.double_value  = float(cam.focal_length)
+        self._sw.double_value  = float(cam.sensor_width)
+        self._rw.int_value     = int(cam.image_width)
+        self._rh.int_value     = int(cam.image_height)
         self._near.double_value = float(cam.near)
-        self._far.double_value = float(cam.far)
+        self._far.double_value  = float(cam.far)
         self._marker_radius.double_value = float(self.camera_marker_radius)
+        self._cam_select_lbl.text = f"Camera {self.active_camera_idx + 1} / {len(self.cameras)}"
         self._refresh_fov_labels()
         self._refresh_selection_label()
         self._update_camera_info_display()
+        # update project name label if it exists
+        if hasattr(self, "_proj_name_lbl") and self._current_project_name:
+            self._proj_name_lbl.text = self._current_project_name
 
     def _update_object_panel(self):
         self._ox.double_value = float(self.object_translation[0])
@@ -1221,216 +1245,283 @@ class CameraPlanner:
     # -- Section: Object --------------------------------------
 
     def _build_mesh_section(self):
-        self.panel.add_child(self._section_lbl("[ OBJECT ]"))
+        col = gui.CollapsableVert("  SCENE OBJECT", 6, gui.Margins(6, 6, 6, 6))
 
-        btn_load = gui.Button("Load Object (Mesh or Point Cloud)")
+        btn_load = gui.Button("Load Mesh / Point Cloud")
         btn_load.set_on_clicked(self._on_load_mesh)
-        self.panel.add_child(btn_load)
-        self.panel.add_child(self._key_lbl("Supported: STL/OBJ/PLY/GLB and COLMAP points3D.txt"))
+        col.add_child(btn_load)
 
-        self._glb_unit_scale = self._float_ne(1000.0, 78)
-        self.panel.add_child(self._kv_row("GLB mm per unit", self._glb_unit_scale))
-        self.panel.add_child(self._key_lbl("Use 1000 for meter-based GLB, 1 for mm-based GLB."))
+        sub_lbl = gui.Label("STL  OBJ  PLY  GLB  PCD  COLMAP points3D.txt")
+        sub_lbl.text_color = self._ui["subtle"]
+        col.add_child(sub_lbl)
 
-        self.panel.add_child(self._key_lbl("-- or create a cuboid --"))
+        glb_row = gui.Horiz(6)
+        glb_row.add_child(self._key_lbl("GLB mm/unit:"))
+        glb_row.add_stretch()
+        self._glb_unit_scale = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._glb_unit_scale.double_value = 1000.0
+        self._glb_unit_scale.decimal_precision = 1
+        self._glb_unit_scale.set_preferred_width(72)
+        glb_row.add_child(self._glb_unit_scale)
+        col.add_child(glb_row)
 
-        # L / W / H on one row with plain letter labels
+        div = gui.Label("  -- or generate a box primitive --")
+        div.text_color = self._ui["subtle"]
+        col.add_child(div)
+
         lwh_row = gui.Horiz(4)
-        self._cube_lx = self._float_ne(1.0, 58)
-        self._cube_ly = self._float_ne(0.5, 58)
-        self._cube_lz = self._float_ne(0.5, 58)
-        for label, ne in (("L", self._cube_lx),
-                          ("W", self._cube_ly),
-                          ("H", self._cube_lz)):
+        self._cube_lx = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._cube_ly = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._cube_lz = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._cube_lx.double_value = 1.0
+        self._cube_ly.double_value = 0.5
+        self._cube_lz.double_value = 0.5
+        for lbl_txt, ne in (("L", self._cube_lx), ("W", self._cube_ly), ("H", self._cube_lz)):
+            ne.decimal_precision = 3
+            ne.set_preferred_width(60)
+            ax_lbl = gui.Label(lbl_txt)
+            ax_lbl.text_color = self._ui["accent"]
             sub = gui.Horiz(2)
-            al = gui.Label(label)
-            al.text_color = gui.Color(0.40, 0.80, 0.40)
-            sub.add_child(al)
+            sub.add_child(ax_lbl)
             sub.add_child(ne)
             lwh_row.add_child(sub)
-        self.panel.add_child(lwh_row)
+        col.add_child(lwh_row)
 
-        btn_cube = gui.Button("Create Cuboid")
+        btn_cube = gui.Button("Generate Cuboid")
         btn_cube.set_on_clicked(self._on_create_cuboid)
-        self.panel.add_child(btn_cube)
+        col.add_child(btn_cube)
 
         self._mesh_status = gui.Label("No object loaded")
-        self._mesh_status.text_color = gui.Color(0.52, 0.52, 0.52)
-        self.panel.add_child(self._mesh_status)
-        
-        # Scaling info
-        scale_info = gui.Label("To scale mesh: adjust Scale field or use Quick scale buttons below")
-        scale_info.text_color = gui.Color(0.70, 0.70, 0.70)
-        self.panel.add_child(scale_info)
+        self._mesh_status.text_color = self._ui["muted"]
+        col.add_child(self._mesh_status)
+
+        self.panel.add_child(col)
 
     # -- Section: Camera --------------------------------------
 
     def _build_camera_section(self):
-        self.panel.add_child(self._section_lbl("[ CAMERA ]"))
+        col = gui.CollapsableVert("  ACTIVE CAMERA SETTINGS", 6, gui.Margins(6, 6, 6, 6))
 
-        sel_row = gui.Horiz(6)
+        # Header row – index / edit / delete
+        hdr = gui.Horiz(4)
         self._cam_select_lbl = gui.Label("Camera 1 / 1")
-        self._cam_select_lbl.text_color = gui.Color(0.65, 0.85, 1.0)
-        sel_row.add_child(self._cam_select_lbl)
-        sel_row.add_stretch()
-        btn_config = gui.Button("Edit")
-        btn_config.set_on_clicked(self._on_edit_selected_camera)
-        sel_row.add_child(btn_config)
-        btn_delete = gui.Button("Delete")
-        btn_delete.set_on_clicked(self._on_delete_selected_camera)
-        sel_row.add_child(btn_delete)
-        self.panel.add_child(sel_row)
+        self._cam_select_lbl.text_color = gui.Color(1.0, 1.0, 1.0)
+        hdr.add_child(self._cam_select_lbl)
+        hdr.add_stretch()
+        btn_edit = gui.Button("Edit")
+        btn_edit.set_on_clicked(self._on_edit_selected_camera)
+        btn_del  = gui.Button("Delete")
+        btn_del.set_on_clicked(self._on_delete_selected_camera)
+        hdr.add_child(btn_edit)
+        hdr.add_child(btn_del)
+        col.add_child(hdr)
 
-        # Display current sensor & resolution info
+        # Sensor / resolution info (read-only labels)
         self._cam_sensor_info = gui.Label("Sensor: --")
-        self._cam_sensor_info.text_color = gui.Color(0.60, 0.80, 0.95)
-        self.panel.add_child(self._cam_sensor_info)
-
+        self._cam_sensor_info.text_color = self._ui["muted"]
         self._cam_resolution_info = gui.Label("Resolution: --")
-        self._cam_resolution_info.text_color = gui.Color(0.60, 0.80, 0.95)
-        self.panel.add_child(self._cam_resolution_info)
+        self._cam_resolution_info.text_color = self._ui["muted"]
+        col.add_child(self._cam_sensor_info)
+        col.add_child(self._cam_resolution_info)
 
+        # Camera position XYZ
         pos_block, (self._cx, self._cy, self._cz) = self._xyz_block(
             "Position (mm)", self._cam().position)
-        self.panel.add_child(pos_block)
+        col.add_child(pos_block)
 
+        # Look-At XYZ
         lat_block, (self._lx, self._ly, self._lz) = self._xyz_block(
-            "Look-At  (mm)", self._cam().lookat)
-        self.panel.add_child(lat_block)
+            "Look-At (mm)", self._cam().lookat)
+        col.add_child(lat_block)
 
-        self._fl = self._float_ne(self._cam().focal_length, 78)
-        self.panel.add_child(self._kv_row("Focal length (mm)", self._fl))
+        # Optics grid – focal / sensor / near / far
+        def _ne_row(label, ne_widget):
+            r = gui.Horiz(4)
+            lbl = gui.Label(label)
+            lbl.text_color = self._ui["key"]
+            r.add_child(lbl)
+            r.add_stretch()
+            r.add_child(ne_widget)
+            return r
 
-        self._sw = self._float_ne(self._cam().sensor_width, 78)
-        self.panel.add_child(self._kv_row("Sensor width  (mm)", self._sw))
+        self._fl = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._fl.double_value = self._cam().focal_length
+        self._fl.decimal_precision = 2
+        self._fl.set_preferred_width(78)
+        col.add_child(_ne_row("Focal length (mm)", self._fl))
 
-        self._rw = self._int_ne(self._cam().image_width,  90)
-        self._rh = self._int_ne(self._cam().image_height, 90)
+        self._sw = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._sw.double_value = self._cam().sensor_width
+        self._sw.decimal_precision = 3
+        self._sw.set_preferred_width(78)
+        col.add_child(_ne_row("Sensor width (mm)", self._sw))
+
+        self._near = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._near.double_value = self._cam().near
+        self._near.decimal_precision = 1
+        self._near.set_preferred_width(78)
+        col.add_child(_ne_row("Near plane (mm)", self._near))
+
+        self._far = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._far.double_value = self._cam().far
+        self._far.decimal_precision = 1
+        self._far.set_preferred_width(78)
+        col.add_child(_ne_row("Far plane (mm)", self._far))
+
+        # Resolution row
         res_row = gui.Horiz(6)
-        res_row.add_child(self._key_lbl("Resolution (px)"))
+        res_lbl = gui.Label("Resolution (px)")
+        res_lbl.text_color = self._ui["key"]
+        res_row.add_child(res_lbl)
         res_row.add_stretch()
+        self._rw = gui.NumberEdit(gui.NumberEdit.INT)
+        self._rw.int_value = self._cam().image_width
+        self._rw.set_preferred_width(58)
+        self._rh = gui.NumberEdit(gui.NumberEdit.INT)
+        self._rh.int_value = self._cam().image_height
+        self._rh.set_preferred_width(58)
+        sep_lbl = gui.Label("x")
+        sep_lbl.text_color = self._ui["subtle"]
         res_row.add_child(self._rw)
-        res_row.add_child(gui.Label("x"))
+        res_row.add_child(sep_lbl)
         res_row.add_child(self._rh)
-        self.panel.add_child(res_row)
-        self.panel.add_child(self._key_lbl("Set resolution width and height for the selected camera."))
+        col.add_child(res_row)
 
-        self._near = self._float_ne(self._cam().near, 78)
-        self.panel.add_child(self._kv_row("Near plane   (mm)", self._near))
+        # Marker radius
+        self._marker_radius = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._marker_radius.double_value = self.camera_marker_radius
+        self._marker_radius.decimal_precision = 1
+        self._marker_radius.set_preferred_width(78)
+        col.add_child(_ne_row("Marker radius (mm)", self._marker_radius))
 
-        self._far = self._float_ne(self._cam().far, 78)
-        self.panel.add_child(self._kv_row("Far plane    (mm)", self._far))
-
-        self._marker_radius = self._float_ne(self.camera_marker_radius, 78)
-        self.panel.add_child(self._kv_row("Camera marker radius (mm)", self._marker_radius))
-
+        # Roll buttons
         roll_row = gui.Horiz(4)
-        roll_row.add_child(self._key_lbl("Roll around optical axis"))
+        roll_lbl = gui.Label("Roll camera:")
+        roll_lbl.text_color = self._ui["key"]
+        roll_row.add_child(roll_lbl)
         roll_row.add_stretch()
-        btn_roll_m = gui.Button("Roll -90")
-        btn_roll_p = gui.Button("Roll +90")
-        btn_roll_m.set_on_clicked(lambda: self._on_roll_camera(-90.0))
-        btn_roll_p.set_on_clicked(lambda: self._on_roll_camera(+90.0))
-        roll_row.add_child(btn_roll_m)
-        roll_row.add_child(btn_roll_p)
-        self.panel.add_child(roll_row)
+        btn_rm = gui.Button("Roll -90")
+        btn_rp = gui.Button("Roll +90")
+        btn_rm.set_on_clicked(lambda: self._on_roll_camera(-90.0))
+        btn_rp.set_on_clicked(lambda: self._on_roll_camera(+90.0))
+        roll_row.add_child(btn_rm)
+        roll_row.add_child(btn_rp)
+        col.add_child(roll_row)
+
+        apply_btn = gui.Button("Apply Camera Updates")
+        apply_btn.set_on_clicked(self._on_update_camera)
+        col.add_child(apply_btn)
+
+        self.panel.add_child(col)
 
     # -- Section: Actions -------------------------------------
 
     def _build_action_section(self):
-        self.panel.add_child(self._section_lbl("[ ACTIONS ]"))
+        # ── Status chips ──────────────────────────────────
+        status_col = gui.CollapsableVert("  STATUS", 4, gui.Margins(6, 4, 6, 4))
 
-        sel_row = gui.Horiz(6)
-        self._selection_dot = gui.Label("###")
-        self._selection_dot.text_color = gui.Color(0.10, 0.75, 0.95)
-        self._selection_label = gui.Label("Selected: Camera 1")
-        self._selection_label.text_color = self._ui["key"]
-        sel_row.add_child(self._selection_dot)
-        sel_row.add_child(self._selection_label)
-        self.panel.add_child(sel_row)
-
-        self.panel.add_child(self._section_lbl("[ STATUS CHIPS ]"))
-        chip_row1 = gui.Horiz(6)
+        chips = gui.Horiz(8)
         self._chip_mode = gui.Label("Mode: Idle")
         self._chip_mode.text_color = self._ui["muted"]
         self._chip_cov = gui.Label("Coverage: --")
         self._chip_cov.text_color = self._ui["muted"]
-        chip_row1.add_child(self._chip_mode)
-        chip_row1.add_child(self._chip_cov)
-        self.panel.add_child(chip_row1)
-
-        chip_row2 = gui.Horiz(6)
-        self._chip_detect = gui.Label("Detectability: --")
+        self._chip_detect = gui.Label("Detect: --")
         self._chip_detect.text_color = self._ui["muted"]
-        chip_row2.add_child(self._chip_detect)
-        self.panel.add_child(chip_row2)
-
-        self._build_camera_legend_section()
-
-        self.panel.add_child(self._section_lbl("[ PRIMARY ]"))
-        btn_cov = gui.Button("Compute Coverage")
-        btn_cov.set_on_clicked(self._on_compute_coverage)
-        self.panel.add_child(btn_cov)
-
-        btn_upd = gui.Button("Update Camera")
-        btn_upd.set_on_clicked(self._on_update_camera)
-        self.panel.add_child(btn_upd)
-
-        self.panel.add_child(self._section_lbl("[ SECONDARY ]"))
-        btn_add = gui.Button("Add Camera")
-        btn_add.set_on_clicked(self._on_add_camera)
-        self.panel.add_child(btn_add)
-
-        btn_next = gui.Button("Switch Camera")
-        btn_next.set_on_clicked(self._on_next_camera)
-        self.panel.add_child(btn_next)
-
-        btn_show_overall = gui.Button("Show Overall Coverage")
-        btn_show_overall.set_on_clicked(self._on_show_overall_coverage)
-        self.panel.add_child(btn_show_overall)
-
-        btn_reset_cov = gui.Button("Reset Coverage View")
-        btn_reset_cov.set_on_clicked(self._on_reset_coverage_view)
-        self.panel.add_child(btn_reset_cov)
+        chips.add_child(self._chip_mode)
+        chips.add_child(self._chip_cov)
+        chips.add_child(self._chip_detect)
+        status_col.add_child(chips)
 
         self._status_lbl = gui.Label("Ready.")
-        self._status_lbl.text_color = self._ui["muted"]
-        self.panel.add_child(self._status_lbl)
+        self._status_lbl.text_color = self._ui["subtle"]
+        status_col.add_child(self._status_lbl)
+        self.panel.add_child(status_col)
 
-        self._n_samples = self._int_ne(20000, 80)
-        self.panel.add_child(self._kv_row("Sample points", self._n_samples))
+        # ── Coverage actions ──────────────────────────────
+        cov_col = gui.CollapsableVert("  COVERAGE ANALYSIS", 6, gui.Margins(6, 6, 6, 6))
 
-        self.panel.add_child(self._hsep())
-        self.panel.add_child(self._section_lbl("[ REPORTS & TRIALS ]"))
+        btn_cov = gui.Button("  Compute Coverage  ")
+        btn_cov.set_on_clicked(self._on_compute_coverage)
+        cov_col.add_child(btn_cov)
+
+        view_row = gui.Horiz(6)
+        btn_overall = gui.Button("Show Overall")
+        btn_overall.set_on_clicked(self._on_show_overall_coverage)
+        btn_reset   = gui.Button("Reset View")
+        btn_reset.set_on_clicked(self._on_reset_coverage_view)
+        view_row.add_child(btn_overall)
+        view_row.add_child(btn_reset)
+        cov_col.add_child(view_row)
+
+        ns_row = gui.Horiz(4)
+        ns_row.add_child(self._key_lbl("Sample points:"))
+        ns_row.add_stretch()
+        self._n_samples = gui.NumberEdit(gui.NumberEdit.INT)
+        self._n_samples.int_value = 20000
+        self._n_samples.set_preferred_width(78)
+        ns_row.add_child(self._n_samples)
+        cov_col.add_child(ns_row)
+
+        self.panel.add_child(cov_col)
+
+        # ── Reports & Trials ─────────────────────────────
+        rep_col = gui.CollapsableVert("  REPORTS & TRIALS", 6, gui.Margins(6, 6, 6, 6))
+
         btn_export = gui.Button("Export Report")
         btn_export.set_on_clicked(self._on_export_report)
-        self.panel.add_child(btn_export)
-        trial_row = gui.Horiz(4)
-        btn_save_trial = gui.Button("Save Trial")
-        btn_save_trial.set_on_clicked(self._on_save_trial)
-        btn_load_trial = gui.Button("Load Trial")
-        btn_load_trial.set_on_clicked(self._on_load_trial)
-        trial_row.add_child(btn_save_trial)
-        trial_row.add_child(btn_load_trial)
-        self.panel.add_child(trial_row)
-        self.panel.add_child(self._key_lbl("Report: screenshot + HTML with camera config."))
-        self.panel.add_child(self._key_lbl("Trial: full state to resume experiment later."))
+        rep_col.add_child(btn_export)
+
+        trial_row = gui.Horiz(6)
+        btn_save_t = gui.Button("Save Trial")
+        btn_save_t.set_on_clicked(self._on_save_trial)
+        btn_load_t = gui.Button("Load Trial")
+        btn_load_t.set_on_clicked(self._on_load_trial)
+        trial_row.add_child(btn_save_t)
+        trial_row.add_child(btn_load_t)
+        rep_col.add_child(trial_row)
+
+        hint = gui.Label("Report = screenshot + HTML.  Trial = full resumable state.")
+        hint.text_color = self._ui["subtle"]
+        rep_col.add_child(hint)
+        self.panel.add_child(rep_col)
 
     def _build_camera_legend_section(self):
-        self.panel.add_child(self._section_lbl("[ CAMERA LEGEND ]"))
+        col = gui.CollapsableVert("  CAMERA LIST", 6, gui.Margins(6, 6, 6, 6))
+
+        top_row = gui.Horiz(4)
+        btn_add = gui.Button("+ Add Camera")
+        btn_add.set_on_clicked(self._on_add_camera)
+        btn_next = gui.Button("Switch")
+        btn_next.set_on_clicked(self._on_next_camera)
+        top_row.add_child(btn_add)
+        top_row.add_child(btn_next)
+        col.add_child(top_row)
+
+        # Selection status row
+        sel_row = gui.Horiz(4)
+        self._selection_dot = gui.Label("  ")
+        self._selection_dot.text_color = gui.Color(0.10, 0.75, 0.95)
+        self._selection_label = gui.Label("Selected: Camera 1")
+        self._selection_label.text_color = self._ui["value"]
+        sel_row.add_child(self._selection_dot)
+        sel_row.add_child(self._selection_label)
+        col.add_child(sel_row)
+
         self._legend_rows = []
         self._legend_max = 20
         for i in range(self._legend_max):
             row = gui.Horiz(4)
-            swatch = gui.Label("###")
+            swatch = gui.Label("  ")
             swatch.text_color = gui.Color(0.7, 0.7, 0.7)
-            name_btn = gui.Button(f"Camera {i + 1}")
+            name_btn = gui.Button(f"  Camera {i + 1}")
             name_btn.set_on_clicked(lambda idx=i: self._on_legend_camera_click(idx))
             row.add_child(swatch)
             row.add_child(name_btn)
             row.visible = False
-            self.panel.add_child(row)
+            col.add_child(row)
             self._legend_rows.append((row, swatch, name_btn))
+
+        self.panel.add_child(col)
 
     def _on_legend_camera_click(self, idx: int):
         if idx < len(self.cameras):
@@ -1443,89 +1534,101 @@ class CameraPlanner:
             if i < len(self.cameras):
                 c = self._camera_color(i)
                 row.visible = True
-                swatch.text = "###"
+                swatch.text = "[*]"
                 swatch.text_color = gui.Color(float(c[0]), float(c[1]), float(c[2]))
                 if i == self.active_camera_idx:
-                    name_btn.text = f"> Camera {i + 1} (selected)"
+                    name_btn.text = f">> Camera {i + 1}  (active)"
                 else:
-                    name_btn.text = f"Camera {i + 1}"
+                    name_btn.text = f"   Camera {i + 1}"
             else:
                 row.visible = False
 
     # -- Section: Coverage stats ------------------------------
 
     def _build_stats_section(self):
-        self.panel.add_child(self._section_lbl("[ COVERAGE STATS ]"))
+        col = gui.CollapsableVert("  COVERAGE STATISTICS", 6, gui.Margins(6, 6, 6, 6))
         self._sv = {}
 
         stat_defs = [
-            ("coverage", "Overall coverage"),
-            ("camera_coverage", "Selected coverage"),
-            ("visible", "Overall visible pts"),
-            ("camera_visible", "Selected visible pts"),
-            ("total", "Sample points"),
-            ("avg_dist", "Avg distance (mm)"),
-            ("mm_per_px", "Resolution (mm/px)"),
-            ("fov_h_deg", "FOV H (deg)"),
-            ("fov_v_deg", "FOV V (deg)"),
+            ("coverage",        "Overall coverage"),
+            ("camera_coverage", "Selected camera cov."),
+            ("visible",         "Overall visible pts"),
+            ("camera_visible",  "Selected visible pts"),
+            ("total",           "Sample points"),
+            ("avg_dist",        "Avg distance (mm)"),
+            ("mm_per_px",       "Resolution (mm/px)"),
+            ("fov_h_deg",       "FOV horizontal (deg)"),
+            ("fov_v_deg",       "FOV vertical (deg)"),
         ]
+        grid = gui.VGrid(2, 4)
         for key, name in stat_defs:
-            row = gui.Horiz(6)
             k = gui.Label(name)
             k.text_color = self._ui["key"]
-            row.add_child(k)
-            row.add_stretch()
-            v = self._val_lbl("--")
-            row.add_child(v)
-            self.panel.add_child(row)
+            v = gui.Label("--")
+            v.text_color = self._ui["value"]
+            grid.add_child(k)
+            grid.add_child(v)
             self._sv[key] = v
+        col.add_child(grid)
+        self.panel.add_child(col)
 
-        self.panel.add_child(self._hsep())
-        self.panel.add_child(self._section_lbl("[ DEFECT DETECTABILITY ]"))
-        
-        self._defect_size = self._float_ne(1.0, 78)
-        self.panel.add_child(self._kv_row("Defect size (mm)", self._defect_size))
-        self.panel.add_child(self._key_lbl("Recompute coverage to apply detectability mode."))
-        
-        # Thresholds display
-        self.panel.add_child(self._key_lbl("Detection thresholds:"))
-        self.panel.add_child(self._key_lbl("RED: < 3 px (undetectable)"))
-        self.panel.add_child(self._key_lbl("YELLOW: 3-8 px (marginal)"))
-        self.panel.add_child(self._key_lbl("GREEN: >= 8 px (detectable)"))
-        
-        btn_refresh_defect = gui.Button("Refresh Detectability")
-        btn_refresh_defect.set_on_clicked(self._on_refresh_detectability)
-        self.panel.add_child(btn_refresh_defect)
+        # ── Defect detectability ──────────────────────────
+        det_col = gui.CollapsableVert("  DEFECT DETECTABILITY", 6, gui.Margins(6, 6, 6, 6))
+
+        ds_row = gui.Horiz(4)
+        ds_row.add_child(self._key_lbl("Defect size (mm):"))
+        ds_row.add_stretch()
+        self._defect_size = gui.NumberEdit(gui.NumberEdit.DOUBLE)
+        self._defect_size.double_value = 1.0
+        self._defect_size.decimal_precision = 2
+        self._defect_size.set_preferred_width(78)
+        ds_row.add_child(self._defect_size)
+        det_col.add_child(ds_row)
+
+        legend_grid = gui.VGrid(2, 3)
+        for color_str, desc in [
+            ("RED  < 3 px",       "Undetectable"),
+            ("YELLOW  3-8 px",    "Marginal"),
+            ("GREEN  >= 8 px",    "Detectable"),
+        ]:
+            k = gui.Label(color_str)
+            k.text_color = self._ui["key"]
+            v = gui.Label(desc)
+            v.text_color = self._ui["muted"]
+            legend_grid.add_child(k)
+            legend_grid.add_child(v)
+        det_col.add_child(legend_grid)
+
+        btn_ref = gui.Button("Refresh Detectability")
+        btn_ref.set_on_clicked(self._on_refresh_detectability)
+        det_col.add_child(btn_ref)
+        self.panel.add_child(det_col)
 
     # -- Section: Navigation hints ----------------------------
 
     def _build_nav_section(self):
-        self.panel.add_child(self._section_lbl("[ 3D NAVIGATION ]"))
-        hints = [
-            ("Orbit",        "Left-drag"),
-            ("Pan",          "Right-drag"),
-            ("Zoom",         "2-finger scroll"),
-            ("Zoom (mouse)", "Scroll wheel"),
-            ("Reset view",   "F key"),
-        ]
-        for action, gesture in hints:
-            row = gui.Horiz(4)
-            a = gui.Label(action)
-            a.text_color = gui.Color(0.58, 0.58, 0.58)
-            g = gui.Label(gesture)
-            g.text_color = gui.Color(0.48, 0.74, 0.95)
-            row.add_child(a)
-            row.add_stretch()
-            row.add_child(g)
-            self.panel.add_child(row)
+        col = gui.CollapsableVert("  3D NAVIGATION", 4, gui.Margins(6, 4, 6, 4))
 
-        # Plain ASCII - no Unicode warning sign
-        note = gui.Label(
-            "Note: native pinch-to-zoom is not\n"
-            "supported by Open3D. Use 2-finger\n"
-            "scroll to zoom on the trackpad.")
-        note.text_color = gui.Color(0.58, 0.56, 0.38)
-        self.panel.add_child(note)
+        hints = [
+            ("Orbit",       "Left-drag"),
+            ("Pan",         "Right-drag"),
+            ("Zoom",        "Scroll wheel"),
+            ("Reset view",  "F key"),
+        ]
+        grid = gui.VGrid(2, 3)
+        for action, gesture in hints:
+            a = gui.Label(action)
+            a.text_color = self._ui["subtle"]
+            g = gui.Label(gesture)
+            g.text_color = self._ui["accent"]
+            grid.add_child(a)
+            grid.add_child(g)
+        col.add_child(grid)
+
+        note = gui.Label("Tip: use scroll wheel to zoom, right-drag to pan.")
+        note.text_color = self._ui["subtle"]
+        col.add_child(note)
+        self.panel.add_child(col)
 
     # -- Scene materials --------------------------------------
 
@@ -1576,9 +1679,9 @@ class CameraPlanner:
         ls = o3d.geometry.LineSet()
         ls.points = o3d.utility.Vector3dVector(pts)
         ls.lines  = o3d.utility.Vector2iVector(lines)
-        ls.colors = o3d.utility.Vector3dVector([[0.75, 0.75, 0.75]] * len(lines))
+        ls.colors = o3d.utility.Vector3dVector([[0.30, 0.31, 0.33]] * len(lines))
         self.scene_widget.scene.add_geometry(
-            self._GRID, ls, self._mat_line([0.60, 0.60, 0.60], width=1.0))
+            self._GRID, ls, self._mat_line([0.28, 0.30, 0.32], width=1.0))
 
     def _add_reference_axes(self, size=4.0):
         pts = [[0.0, 0.0, 0.0], [size, 0.0, 0.0], [0.0, size, 0.0], [0.0, 0.0, size]]
@@ -3018,6 +3121,8 @@ class CameraPlanner:
 
     def _set_status(self, msg: str):
         self._status_lbl.text = msg
+        if hasattr(self, "_proj_name_lbl") and self._current_project_name:
+            self._proj_name_lbl.text = self._current_project_name
 
     def _refresh_fov_labels(self):
         self._sv["fov_h_deg"].text = f"{np.degrees(self._cam().fov_h):.2f}"

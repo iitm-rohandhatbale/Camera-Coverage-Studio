@@ -1,0 +1,11 @@
+{
+  "name": "Seat_Top",
+  "slug": "seat-top",
+  "created_at": "2026-04-09T10:44:52",
+  "updated_at": "2026-04-09T10:44:52",
+  "project_file": "projects\\seat-top\\project.json",
+  "object_type": "cuboid",
+  "object_source": "cuboid",
+  "camera_count": 1,
+  "sample_points": 20000
+}
