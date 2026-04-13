@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "mesh": {
+    "type": "cuboid",
+    "dims": [
+      1.0,
+      0.5,
+      0.5
+    ]
+  },
+  "object": {
+    "translation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 1.0
+  },
+  "cameras": [
+    {
+      "position": [
+        3000.0,
+        3000.0,
+        2000.0
+      ],
+      "lookat": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length": 35.0,
+      "sensor_width": 36.0,
+      "image_width": 1920,
+      "image_height": 1080,
+      "near": 300.0,
+      "far": 12000.0,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "camera_colors": [
+    [
+      0.8,
+      0.55,
+      0.15
+    ]
+  ],
+  "active_camera_idx": 0,
+  "sample_points": 20000,
+  "camera_marker_radius": 50.0
+}

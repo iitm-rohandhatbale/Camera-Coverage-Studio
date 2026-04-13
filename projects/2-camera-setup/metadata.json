@@ -1,0 +1,11 @@
+{
+  "name": "2_camera_setup",
+  "slug": "2-camera-setup",
+  "created_at": "2026-04-02T12:47:38",
+  "updated_at": "2026-04-02T12:47:38",
+  "project_file": "projects/2-camera-setup/project.json",
+  "object_type": "cuboid",
+  "object_source": "cuboid",
+  "camera_count": 2,
+  "sample_points": 20000
+}

@@ -1,111 +1,111 @@
 {
-  "version": 1,
-  "mesh": {
-    "type": "mesh",
-    "path": "C:\\Prem_Varma\\Camera-Coverage-Studio\\3d\\Seat.glb"
-  },
-  "object": {
-    "translation": [
-      10.0,
-      0.0,
-      0.0
-    ],
-    "rotation": [
-      0.0,
-      15.0,
-      0.0
-    ],
-    "scale": 0.8
-  },
-  "cameras": [
-    {
-      "position": [
-        0.0,
-        600.0,
-        0.0
-      ],
-      "lookat": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "focal_length": 4.0,
-      "sensor_width": 4.8,
-      "image_width": 2448,
-      "image_height": 2048,
-      "near": 30.0,
-      "far": 700.0,
-      "up": [
-        0.0,
-        0.0,
-        1.0
-      ]
-    },
-    {
-      "position": [
-        500.0,
-        200.0,
-        500.0
-      ],
-      "lookat": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "focal_length": 4.0,
-      "sensor_width": 4.8,
-      "image_width": 2448,
-      "image_height": 2048,
-      "near": 30.0,
-      "far": 800.0,
-      "up": [
-        0.0,
-        0.0,
-        1.0
-      ]
-    },
-    {
-      "position": [
-        -500.0,
-        200.0,
-        -500.0
-      ],
-      "lookat": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "focal_length": 4.0,
-      "sensor_width": 4.8,
-      "image_width": 2448,
-      "image_height": 2048,
-      "near": 30.0,
-      "far": 800.0,
-      "up": [
-        0.0,
-        0.0,
-        1.0
-      ]
-    }
-  ],
-  "camera_colors": [
-    [
-      0.800000011920929,
-      0.550000011920929,
-      0.15000000596046448
-    ],
-    [
-      0.800000011920929,
-      0.550000011920929,
-      0.15000000596046448
-    ],
-    [
-      0.800000011920929,
-      0.550000011920929,
-      0.15000000596046448
-    ]
-  ],
-  "active_camera_idx": 1,
-  "sample_points": 20000,
-  "camera_marker_radius": 15.0
+    "version":  1,
+    "mesh":  {
+                 "type":  "mesh",
+                 "path":  "3d/Seat.glb"
+             },
+    "object":  {
+                   "translation":  [
+                                       10.0,
+                                       0.0,
+                                       0.0
+                                   ],
+                   "rotation":  [
+                                    0.0,
+                                    15.0,
+                                    0.0
+                                ],
+                   "scale":  0.8
+               },
+    "cameras":  [
+                    {
+                        "position":  [
+                                         0.0,
+                                         600.0,
+                                         0.0
+                                     ],
+                        "lookat":  [
+                                       0.0,
+                                       0.0,
+                                       0.0
+                                   ],
+                        "focal_length":  4.0,
+                        "sensor_width":  4.8,
+                        "image_width":  2448,
+                        "image_height":  2048,
+                        "near":  30.0,
+                        "far":  700.0,
+                        "up":  [
+                                   0.0,
+                                   0.0,
+                                   1.0
+                               ]
+                    },
+                    {
+                        "position":  [
+                                         500.0,
+                                         200.0,
+                                         500.0
+                                     ],
+                        "lookat":  [
+                                       0.0,
+                                       0.0,
+                                       0.0
+                                   ],
+                        "focal_length":  4.0,
+                        "sensor_width":  4.8,
+                        "image_width":  2448,
+                        "image_height":  2048,
+                        "near":  30.0,
+                        "far":  800.0,
+                        "up":  [
+                                   0.0,
+                                   0.0,
+                                   1.0
+                               ]
+                    },
+                    {
+                        "position":  [
+                                         -500.0,
+                                         200.0,
+                                         -500.0
+                                     ],
+                        "lookat":  [
+                                       0.0,
+                                       0.0,
+                                       0.0
+                                   ],
+                        "focal_length":  4.0,
+                        "sensor_width":  4.8,
+                        "image_width":  2448,
+                        "image_height":  2048,
+                        "near":  30.0,
+                        "far":  800.0,
+                        "up":  [
+                                   0.0,
+                                   0.0,
+                                   1.0
+                               ]
+                    }
+                ],
+    "camera_colors":  [
+                          [
+                              0.800000011920929,
+                              0.550000011920929,
+                              0.15000000596046448
+                          ],
+                          [
+                              0.800000011920929,
+                              0.550000011920929,
+                              0.15000000596046448
+                          ],
+                          [
+                              0.800000011920929,
+                              0.550000011920929,
+                              0.15000000596046448
+                          ]
+                      ],
+    "active_camera_idx":  1,
+    "sample_points":  20000,
+    "camera_marker_radius":  15.0
 }

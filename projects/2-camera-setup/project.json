@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "mesh": {
+    "type": "cuboid",
+    "dims": [
+      1.0,
+      0.5,
+      0.5
+    ]
+  },
+  "object": {
+    "translation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "scale": 1.0
+  },
+  "cameras": [
+    {
+      "position": [
+        3.0,
+        3.0,
+        0.0
+      ],
+      "lookat": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length": 35.0,
+      "sensor_width": 36.0,
+      "image_width": 1920,
+      "image_height": 1080,
+      "near": 0.3,
+      "far": 5.0,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "position": [
+        -3.0,
+        3.0,
+        0.0
+      ],
+      "lookat": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length": 16.0,
+      "sensor_width": 36.0,
+      "image_width": 1920,
+      "image_height": 1080,
+      "near": 0.3,
+      "far": 4.0,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "camera_colors": [
+    [
+      0.1,
+      0.75,
+      0.95
+    ],
+    [
+      0.2,
+      0.8,
+      0.3
+    ]
+  ],
+  "active_camera_idx": 1,
+  "sample_points": 20000
+}

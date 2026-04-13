@@ -1,83 +1,83 @@
 {
-  "version": 1,
-  "mesh": {
-    "type": "mesh",
-    "path": "C:\\Prem_Varma\\Camera-Coverage-Studio\\pipe_structure (2).glb"
-  },
-  "object": {
-    "translation": [
-      8.0,
-      0.0,
-      35.0
-    ],
-    "rotation": [
-      0.0,
-      0.0,
-      0.0
-    ],
-    "scale": 0.15
-  },
-  "cameras": [
-    {
-      "position": [
-        -70.0,
-        0.0,
-        70.0
-      ],
-      "lookat": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "focal_length": 3.0,
-      "sensor_width": 4.8,
-      "image_width": 3840,
-      "image_height": 2160,
-      "near": 10.0,
-      "far": 100.0,
-      "up": [
-        1.0,
-        6.123233995736766e-17,
-        0.0
-      ]
-    },
-    {
-      "position": [
-        70.0,
-        0.0,
-        70.0
-      ],
-      "lookat": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "focal_length": 3.0,
-      "sensor_width": 4.8,
-      "image_width": 3840,
-      "image_height": 2160,
-      "near": 10.0,
-      "far": 100.0,
-      "up": [
-        0.0,
-        0.0,
-        1.0
-      ]
-    }
-  ],
-  "camera_colors": [
-    [
-      0.0,
-      1.0,
-      0.9620251655578613
-    ],
-    [
-      0.0,
-      1.0,
-      0.9620251655578613
-    ]
-  ],
-  "active_camera_idx": 1,
-  "sample_points": 20000,
-  "camera_marker_radius": 5.0
+    "version":  1,
+    "mesh":  {
+                 "type":  "mesh",
+                 "path":  "3d/pipe_structure (2).glb"
+             },
+    "object":  {
+                   "translation":  [
+                                       8.0,
+                                       0.0,
+                                       35.0
+                                   ],
+                   "rotation":  [
+                                    0.0,
+                                    0.0,
+                                    0.0
+                                ],
+                   "scale":  0.15
+               },
+    "cameras":  [
+                    {
+                        "position":  [
+                                         -70.0,
+                                         0.0,
+                                         70.0
+                                     ],
+                        "lookat":  [
+                                       0.0,
+                                       0.0,
+                                       0.0
+                                   ],
+                        "focal_length":  3.0,
+                        "sensor_width":  4.8,
+                        "image_width":  3840,
+                        "image_height":  2160,
+                        "near":  10.0,
+                        "far":  100.0,
+                        "up":  [
+                                   1.0,
+                                   6.123233995736766E-17,
+                                   0.0
+                               ]
+                    },
+                    {
+                        "position":  [
+                                         70.0,
+                                         0.0,
+                                         70.0
+                                     ],
+                        "lookat":  [
+                                       0.0,
+                                       0.0,
+                                       0.0
+                                   ],
+                        "focal_length":  3.0,
+                        "sensor_width":  4.8,
+                        "image_width":  3840,
+                        "image_height":  2160,
+                        "near":  10.0,
+                        "far":  100.0,
+                        "up":  [
+                                   0.0,
+                                   0.0,
+                                   1.0
+                               ]
+                    }
+                ],
+    "camera_colors":  [
+                          [
+                              0.0,
+                              1.0,
+                              0.9620251655578613
+                          ],
+                          [
+                              0.0,
+                              1.0,
+                              0.9620251655578613
+                          ]
+                      ],
+    "active_camera_idx":  1,
+    "sample_points":  20000,
+    "camera_marker_radius":  5.0
 }

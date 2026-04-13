@@ -1,0 +1,103 @@
+{
+  "trial_name": "Report 20260407_142543",
+  "timestamp": "2026-04-07T14:25:43",
+  "project_name": "camera_viewer_last_session",
+  "object": {
+    "type": "mesh",
+    "source": "C:\\Users\\RohanDhatbale\\workspace\\experiments\\camera_viewer_tool\\3d\\Wheel Mesh.glb",
+    "translation_mm": [
+      -13.0,
+      -3.0,
+      5.0
+    ],
+    "rotation_deg": [
+      0.0,
+      -30.0,
+      0.0
+    ],
+    "scale": 0.5
+  },
+  "cameras": [
+    {
+      "index": 1,
+      "sensor_name": "1/1.1\" (Basler)",
+      "position_mm": [
+        450.0,
+        450.0,
+        200.0
+      ],
+      "lookat_mm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length_mm": 16.0,
+      "sensor_width_mm": 13.2,
+      "sensor_height_mm": 11.04313725490196,
+      "image_width_px": 2448,
+      "image_height_px": 2048,
+      "near_mm": 30.0,
+      "far_mm": 1000.0,
+      "fov_h_deg": 44.832294958687285,
+      "fov_v_deg": 38.078907919679935,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 2,
+      "sensor_name": "2/3\"",
+      "position_mm": [
+        -450.0,
+        450.0,
+        -200.0
+      ],
+      "lookat_mm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length_mm": 16.0,
+      "sensor_width_mm": 8.8,
+      "sensor_height_mm": 7.362091503267974,
+      "image_width_px": 2448,
+      "image_height_px": 2048,
+      "near_mm": 30.0,
+      "far_mm": 1000.0,
+      "fov_h_deg": 30.75250249765238,
+      "fov_v_deg": 25.91264227344115,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "coverage_stats": {
+    "total": 20000,
+    "visible": 4016,
+    "coverage": 20.08,
+    "avg_dist": 737.1863914146819,
+    "mm_per_px": 0.1656260274828738,
+    "fov_h_deg": 30.75250249765238,
+    "fov_v_deg": 25.91264227344115,
+    "camera_visible": 1428,
+    "camera_coverage": 7.14
+  },
+  "camera_coverages": [
+    {
+      "camera_index": 1,
+      "visible_points": 2753,
+      "coverage_pct": 13.765
+    },
+    {
+      "camera_index": 2,
+      "visible_points": 1428,
+      "coverage_pct": 7.14
+    }
+  ],
+  "defect_size_mm": 1.0,
+  "sample_points": 20000
+}

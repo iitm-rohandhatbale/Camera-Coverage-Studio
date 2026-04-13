@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "mesh": {
+    "type": "pointcloud",
+    "path": "C:\\Users\\RohanDhatbale\\workspace\\experiments\\camera_viewer_tool\\colmap_workflow\\04 SCENES\\shinchan\\pointcloud.ply"
+  },
+  "object": {
+    "translation": [
+      20.0,
+      100.0,
+      -25.0
+    ],
+    "rotation": [
+      135.0,
+      10.0,
+      10.0
+    ],
+    "scale": 30.0
+  },
+  "cameras": [
+    {
+      "position": [
+        300.0,
+        0.0,
+        0.0
+      ],
+      "lookat": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length": 6.0,
+      "sensor_width": 6.0,
+      "image_width": 1080,
+      "image_height": 1920,
+      "near": 30.0,
+      "far": 300.0,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "position": [
+        -300.0,
+        0.0,
+        0.0
+      ],
+      "lookat": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "focal_length": 6.0,
+      "sensor_width": 6.0,
+      "image_width": 1080,
+      "image_height": 1920,
+      "near": 30.0,
+      "far": 300.0,
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "camera_colors": [
+    [
+      0.8,
+      0.55,
+      0.15
+    ],
+    [
+      0.2,
+      0.8,
+      0.3
+    ]
+  ],
+  "active_camera_idx": 1,
+  "sample_points": 20000,
+  "camera_marker_radius": 10.0
+}

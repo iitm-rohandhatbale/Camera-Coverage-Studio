@@ -2068,9 +2068,10 @@ class CameraPlanner:
     def _build_project_state(self) -> dict:
         self._read_camera_ui()
         self._read_object_ui()
+        mesh_source = self._normalize_mesh_source_for_save(self._mesh_source)
         return {
             "version": 1,
-            "mesh": self._mesh_source,
+            "mesh": mesh_source,
             "object": {
                 "translation": self.object_translation.tolist(),
                 "rotation": self.object_rotation.tolist(),
@@ -2099,11 +2100,65 @@ class CameraPlanner:
     def _timestamp_now(self) -> str:
         return datetime.now().isoformat(timespec="seconds")
 
+    def _read_json_file(self, path: str):
+        # Use utf-8-sig to handle JSON files that may include a UTF-8 BOM.
+        with open(path, "r", encoding="utf-8-sig") as f:
+            return json.load(f)
+
     def _safe_relpath(self, path: str) -> str:
         try:
             return os.path.relpath(path, self._workspace_root)
         except Exception:
             return path
+
+    def _normalize_mesh_source_for_save(self, mesh_source: dict) -> dict:
+        if not isinstance(mesh_source, dict):
+            return mesh_source
+        normalized = dict(mesh_source)
+        source_type = str(normalized.get("type", "")).lower()
+        source_path = normalized.get("path")
+        if source_type not in ("mesh", "pointcloud") or not source_path:
+            return normalized
+
+        source_path = str(source_path)
+        ext = os.path.splitext(source_path)[1].lower()
+        filename = os.path.basename(source_path)
+
+        # Keep GLB and PCD sources anchored to workspace 3d folder for portable projects.
+        if source_type == "mesh" and ext == ".glb" and filename:
+            normalized["path"] = f"3d/{filename}"
+            return normalized
+        if source_type == "pointcloud" and ext == ".pcd" and filename:
+            normalized["path"] = f"3d/{filename}"
+            return normalized
+
+        if os.path.isabs(source_path):
+            normalized["path"] = self._safe_relpath(source_path).replace("\\", "/")
+        else:
+            normalized["path"] = source_path.replace("\\", "/")
+        return normalized
+
+    def _resolve_project_asset_path(self, asset_path: str, project_json_path: str) -> str:
+        if not asset_path:
+            return ""
+        if os.path.isabs(asset_path):
+            return os.path.normpath(asset_path)
+
+        project_dir = os.path.dirname(project_json_path)
+        candidates = [
+            os.path.normpath(os.path.join(project_dir, asset_path)),
+            os.path.normpath(os.path.join(self._workspace_root, asset_path)),
+        ]
+
+        # Backward-compatible fallback: if only a filename is stored, try workspace 3d.
+        basename = os.path.basename(asset_path)
+        if basename:
+            candidates.append(os.path.normpath(os.path.join(self._workspace_root, "3d", basename)))
+
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                return candidate
+        return candidates[0]
 
     def _build_project_metadata(self, project_name: str, state: dict,
                                 project_dir: str, created_at: str | None = None) -> dict:
@@ -2126,8 +2181,7 @@ class CameraPlanner:
     def _read_project_metadata(self, project_dir: str) -> dict | None:
         meta_path = self._managed_project_meta_path(project_dir)
         if os.path.exists(meta_path):
-            with open(meta_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            return self._read_json_file(meta_path)
         return None
 
     def _write_project_metadata(self, project_dir: str, meta: dict):
@@ -2292,24 +2346,19 @@ class CameraPlanner:
         return out_path
 
     def _load_project_from_path(self, path: str, show_status: bool = True):
-        with open(path, "r", encoding="utf-8") as f:
-            state = json.load(f)
+        state = self._read_json_file(path)
 
         self._suspend_autosave = True
         try:
             mesh_info = state.get("mesh", {"type": "cuboid", "dims": [1.0, 0.5, 0.5]})
             mesh_type = mesh_info.get("type", "cuboid")
             if mesh_type == "mesh":
-                mesh_path = mesh_info.get("path", "")
-                if mesh_path and not os.path.isabs(mesh_path):
-                    mesh_path = os.path.join(os.path.dirname(path), mesh_path)
+                mesh_path = self._resolve_project_asset_path(mesh_info.get("path", ""), path)
                 if not mesh_path or not os.path.exists(mesh_path):
                     raise FileNotFoundError(f"Mesh path not found: {mesh_path}")
                 self._load_mesh_from_path(mesh_path)
             elif mesh_type == "pointcloud":
-                cloud_path = mesh_info.get("path", "")
-                if cloud_path and not os.path.isabs(cloud_path):
-                    cloud_path = os.path.join(os.path.dirname(path), cloud_path)
+                cloud_path = self._resolve_project_asset_path(mesh_info.get("path", ""), path)
                 if not cloud_path or not os.path.exists(cloud_path):
                     raise FileNotFoundError(f"Point cloud path not found: {cloud_path}")
                 self._load_mesh_from_path(cloud_path)
