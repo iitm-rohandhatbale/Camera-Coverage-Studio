@@ -1,0 +1,11 @@
+{
+  "name": "Untitled Project",
+  "slug": "untitled-project",
+  "created_at": "2026-04-08T11:10:44",
+  "updated_at": "2026-04-08T11:10:44",
+  "project_file": "projects\\untitled-project\\project.json",
+  "object_type": "mesh",
+  "object_source": "wheel_only.glb",
+  "camera_count": 1,
+  "sample_points": 20000
+}

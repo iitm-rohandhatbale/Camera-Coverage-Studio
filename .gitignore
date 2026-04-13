@@ -2,7 +2,7 @@ blender_3d
 colmap_workflow/*
 config/*
 Wheel Mesh
-projects/*
+# projects/*
 camera_viewer_last_session.json
 
 # Byte-compiled / optimized / DLL files

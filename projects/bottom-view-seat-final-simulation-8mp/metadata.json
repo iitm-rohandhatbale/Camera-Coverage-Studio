@@ -1,0 +1,11 @@
+{
+  "name": "Bottom_View_Seat_Final_Simulation_8mp",
+  "slug": "bottom-view-seat-final-simulation-8mp",
+  "created_at": "2026-04-09T18:16:26",
+  "updated_at": "2026-04-09T18:16:26",
+  "project_file": "projects\\bottom-view-seat-final-simulation-8mp\\project.json",
+  "object_type": "mesh",
+  "object_source": "seat_only_backside_clean2.glb",
+  "camera_count": 1,
+  "sample_points": 20000
+}

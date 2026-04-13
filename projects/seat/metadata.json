@@ -1,0 +1,11 @@
+{
+  "name": "Seat",
+  "slug": "seat",
+  "created_at": "2026-04-08T17:35:50",
+  "updated_at": "2026-04-08T17:35:50",
+  "project_file": "projects\\seat\\project.json",
+  "object_type": "mesh",
+  "object_source": "Seat.glb",
+  "camera_count": 1,
+  "sample_points": 20000
+}

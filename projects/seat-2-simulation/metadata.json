@@ -1,0 +1,11 @@
+{
+  "name": "Seat_2_simulation",
+  "slug": "seat-2-simulation",
+  "created_at": "2026-04-08T18:12:24",
+  "updated_at": "2026-04-08T18:12:31",
+  "project_file": "projects\\seat-2-simulation\\project.json",
+  "object_type": "mesh",
+  "object_source": "Seat.glb",
+  "camera_count": 3,
+  "sample_points": 20000
+}
